@@ -1,0 +1,17 @@
+{
+  "name": "名片管家 CardKeeper",
+  "short_name": "名片管家",
+  "description": "拍照 → OCR → 自動整理的名片管家，資料儲存在裝置本機。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#232B38",
+  "theme_color": "#232B38",
+  "lang": "zh-Hant-TW",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

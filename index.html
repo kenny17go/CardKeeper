@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>名片管家 CardKeeper</title>
+<meta name="description" content="拍照 → OCR → 自動整理的名片管家">
+
+<!-- PWA / iOS home screen -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#232B38">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="名片管家">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ===================== App shell ===================== -->
+<div id="app">
+
+  <!-- Top bar: drawer label -->
+  <header class="topbar">
+    <div class="brandmark" aria-hidden="true">
+      <span class="brandmark-tab"></span>
+      <span class="brandmark-dot"></span>
+    </div>
+    <div class="brand-text">
+      <h1>名片管家</h1>
+      <p>Card<span>Keeper</span></p>
+    </div>
+    <button id="btnBackup" class="icon-btn" title="備份 / 還原" aria-label="備份與還原">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.3V4a1 1 0 0 1 1-1zM5 15a1 1 0 0 1 1 1v3h12v-3a1 1 0 1 1 2 0v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a1 1 0 0 1 1-1z"/></svg>
+    </button>
+  </header>
+
+  <!-- Search + tab dividers (categories) -->
+  <div class="controlbar">
+    <div class="search">
+      <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M10 2a8 8 0 1 0 4.9 14.32l4.39 4.38a1 1 0 0 0 1.42-1.41l-4.38-4.39A8 8 0 0 0 10 2zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12z"/></svg>
+      <input id="searchInput" type="search" placeholder="搜尋姓名、公司、職稱、電話、Email…" autocomplete="off">
+    </div>
+    <div id="tagTabs" class="tag-tabs" role="tablist" aria-label="分類">
+      <!-- populated by JS: 全部 / 最愛 / dynamic category tabs -->
+    </div>
+  </div>
+
+  <!-- Card catalog -->
+  <main id="cardList" class="card-grid" aria-live="polite">
+    <!-- populated by JS -->
+  </main>
+
+  <div id="emptyState" class="empty-state hidden">
+    <div class="empty-tab"></div>
+    <h2>抽屜是空的</h2>
+    <p>點右下角相機，拍下第一張名片。</p>
+  </div>
+
+  <!-- Floating capture button -->
+  <button id="btnCapture" class="fab" aria-label="拍攝名片">
+    <svg viewBox="0 0 24 24" width="26" height="26"><path fill="currentColor" d="M9.17 4l-1.83 2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.34L14.83 4H9.17zM12 9a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+  </button>
+
+</div>
+
+<!-- ===================== Camera / Capture Screen ===================== -->
+<section id="screenCamera" class="screen hidden" aria-label="拍攝名片">
+  <div class="camera-wrap">
+    <video id="video" playsinline autoplay muted></video>
+    <canvas id="captureCanvas" class="hidden"></canvas>
+    <div class="card-guide" aria-hidden="true">
+      <span class="corner tl"></span><span class="corner tr"></span>
+      <span class="corner bl"></span><span class="corner br"></span>
+      <p>將名片對齊框線</p>
+    </div>
+  </div>
+  <div class="camera-actions">
+    <button id="btnCloseCamera" class="btn-ghost-round">取消</button>
+    <button id="btnShoot" class="shutter" aria-label="拍照"></button>
+    <label class="btn-ghost-round" for="fileInput">相簿</label>
+    <input id="fileInput" type="file" accept="image/*" class="hidden">
+  </div>
+</section>
+
+<!-- ===================== OCR Processing Screen ===================== -->
+<section id="screenProcessing" class="screen hidden" aria-label="辨識中">
+  <div class="processing-card">
+    <div class="processing-tab"></div>
+    <img id="processingPreview" alt="">
+    <div class="scan-line"></div>
+  </div>
+  <p id="processingLabel">正在讀取名片文字…</p>
+  <p id="processingSub" class="sub">OCR 中英文辨識</p>
+</section>
+
+<!-- ===================== Confirm / Edit Screen ===================== -->
+<section id="screenConfirm" class="screen hidden" aria-label="確認名片資料">
+  <header class="sheet-header">
+    <button id="btnConfirmBack" class="icon-btn" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M15.7 4.3a1 1 0 0 1 0 1.4L9.42 12l6.3 6.3a1 1 0 1 1-1.42 1.4l-7-7a1 1 0 0 1 0-1.4l7-7a1 1 0 0 1 1.42 0z"/></svg>
+    </button>
+    <h2>確認名片資料</h2>
+    <button id="btnSaveCard" class="btn-brass">儲存</button>
+  </header>
+
+  <div class="confirm-body">
+    <div class="confirm-photo-row">
+      <img id="confirmThumb" alt="名片照片">
+      <p class="hint">已自動判讀，請確認欄位無誤</p>
+    </div>
+
+    <form id="cardForm" class="card-form">
+      <label class="field">
+        <span>👤 姓名</span>
+        <input name="name" type="text" placeholder="王小明">
+      </label>
+      <label class="field">
+        <span>🔤 英文姓名</span>
+        <input name="nameEn" type="text" placeholder="Wang Xiao-Ming">
+      </label>
+      <label class="field">
+        <span>🏢 公司</span>
+        <input name="company" type="text" placeholder="OO股份有限公司">
+      </label>
+      <label class="field">
+        <span>💼 職稱</span>
+        <input name="title" type="text" placeholder="業務經理">
+      </label>
+      <label class="field">
+        <span>📱 手機</span>
+        <input name="mobile" type="tel" placeholder="0912-345-678">
+      </label>
+      <label class="field">
+        <span>☎️ 電話</span>
+        <input name="phone" type="tel" placeholder="02-1234-5678">
+      </label>
+      <label class="field">
+        <span>✉️ Email</span>
+        <input name="email" type="email" placeholder="name@company.com">
+      </label>
+      <label class="field">
+        <span>🌐 網站</span>
+        <input name="website" type="text" placeholder="www.company.com">
+      </label>
+      <label class="field">
+        <span>📍 地址</span>
+        <textarea name="address" rows="2" placeholder="台北市信義區..."></textarea>
+      </label>
+      <label class="field">
+        <span>🏷️ 分類</span>
+        <input name="category" type="text" placeholder="自動分類，可自行修改" list="categoryOptions">
+        <datalist id="categoryOptions"></datalist>
+      </label>
+      <label class="field">
+        <span>📝 備註</span>
+        <textarea name="note" rows="2" placeholder="會面地點、介紹人…"></textarea>
+      </label>
+      <label class="field checkbox-field">
+        <input name="favorite" type="checkbox">
+        <span>⭐ 加入最愛</span>
+      </label>
+    </form>
+
+    <details class="raw-text-box">
+      <summary>顯示原始 OCR 文字</summary>
+      <pre id="rawOcrText"></pre>
+    </details>
+  </div>
+</section>
+
+<!-- ===================== Card Detail Screen ===================== -->
+<section id="screenDetail" class="screen hidden" aria-label="名片詳情">
+  <header class="sheet-header">
+    <button id="btnDetailBack" class="icon-btn" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M15.7 4.3a1 1 0 0 1 0 1.4L9.42 12l6.3 6.3a1 1 0 1 1-1.42 1.4l-7-7a1 1 0 0 1 0-1.4l7-7a1 1 0 0 1 1.42 0z"/></svg>
+    </button>
+    <h2>名片詳情</h2>
+    <button id="btnDetailFav" class="icon-btn" aria-label="加入最愛">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+    </button>
+  </header>
+
+  <div class="detail-body">
+    <div class="detail-card">
+      <div class="detail-tab" id="detailTag"></div>
+      <img id="detailThumb" alt="名片照片">
+    </div>
+
+    <h3 id="detailName" class="detail-name"></h3>
+    <p id="detailNameEn" class="detail-nameEn"></p>
+    <p id="detailTitleCompany" class="detail-titleCompany"></p>
+
+    <div class="detail-actions">
+      <button id="actCall" class="action-pill"><span>📞</span>打電話</button>
+      <button id="actMobile" class="action-pill"><span>📱</span>傳簡訊</button>
+      <button id="actEmail" class="action-pill"><span>✉️</span>寄 Email</button>
+      <button id="actMap" class="action-pill"><span>🗺️</span>Apple Maps</button>
+    </div>
+
+    <dl class="detail-fields" id="detailFields"></dl>
+
+    <div class="detail-footer-actions">
+      <button id="btnEditCard" class="btn-outline">編輯</button>
+      <button id="btnDeleteCard" class="btn-danger">刪除名片</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== Backup / Restore Screen ===================== -->
+<section id="screenBackup" class="screen hidden" aria-label="備份與還原">
+  <header class="sheet-header">
+    <button id="btnBackupBack" class="icon-btn" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M15.7 4.3a1 1 0 0 1 0 1.4L9.42 12l6.3 6.3a1 1 0 1 1-1.42 1.4l-7-7a1 1 0 0 1 0-1.4l7-7a1 1 0 0 1 1.42 0z"/></svg>
+    </button>
+    <h2>備份與還原</h2>
+    <span style="width:36px"></span>
+  </header>
+  <div class="backup-body">
+    <div class="backup-card">
+      <p class="backup-count"><span id="backupCardCount">0</span> 張名片，儲存在此裝置</p>
+      <button id="btnExportJson" class="btn-brass full">📤 匯出 JSON 備份</button>
+      <label class="btn-outline full" for="importFile">📥 從 JSON 還原</label>
+      <input id="importFile" type="file" accept="application/json" class="hidden">
+      <p class="backup-note">還原會將備份中的名片與目前資料合併，不會覆蓋既有名片（依 ID 比對）。</p>
+    </div>
+    <div class="backup-card danger">
+      <p class="backup-count">清除本機所有名片資料</p>
+      <button id="btnClearAll" class="btn-danger full">🗑️ 清空全部名片</button>
+    </div>
+  </div>
+</section>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="js/db.js"></script>
+<script src="js/parse.js"></script>
+<script src="js/ocr.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
