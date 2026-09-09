@@ -248,10 +248,16 @@
         const r=await CardVision.detectVideoFrame(video);
         if(r){
           const motion = cornerMotion(r.corners, lastLiveCorners);
-          const clearEnough = (r.sharpness ?? 0) >= 24;
-          const confident = r.confidence >= 40;
-          const steady = motion < 0.018;
-          const qualifies = autoCaptureEnabled && clearEnough && confident && steady && Date.now() >= autoCaptureCooldownUntil;
+          const clearEnough = (r.sharpness ?? 0) >= 20;
+          const confident = r.confidence >= 46;
+          const steady = motion < 0.022;
+          const xs = r.corners.map(p=>p.x), ys = r.corners.map(p=>p.y);
+          const cardW = Math.max(...xs)-Math.min(...xs), cardH = Math.max(...ys)-Math.min(...ys);
+          // Prevent auto capture when the card is so close that its borders are near/outside frame.
+          const framed = Math.min(...xs) > 0.035 && Math.max(...xs) < 0.965 &&
+                         Math.min(...ys) > 0.035 && Math.max(...ys) < 0.965 &&
+                         cardW < 0.91 && cardH < 0.86;
+          const qualifies = autoCaptureEnabled && clearEnough && confident && steady && framed && Date.now() >= autoCaptureCooldownUntil;
           if (qualifies) {
             if (!stableSince) stableSince = Date.now();
             const progress = Math.min(1, (Date.now() - stableSince) / 900);
@@ -267,8 +273,8 @@
             stableSince = 0;
             const p=el('autoCaptureProgress'); if(p)p.style.setProperty('--progress','0deg');
             drawLiveCorners(r, 0);
-            if (autoCaptureEnabled && (!clearEnough || !steady)) {
-              el('guideHint').textContent = !clearEnough ? '已找到名片，請保持清晰' : '已找到名片，請保持不動';
+            if (autoCaptureEnabled && (!clearEnough || !steady || !framed)) {
+              el('guideHint').textContent = !framed ? '請稍微拉遠，讓名片四邊完整入鏡' : (!clearEnough ? '已找到名片，請保持清晰' : '已找到名片，請保持不動');
             }
           }
           lastLiveCorners = r.corners;
@@ -285,9 +291,9 @@
         liveEdgeBusy=false;
       }
       // Deliberately relaxed cadence: keeps Safari controls responsive.
-      if (!screenCamera.classList.contains('hidden')) liveEdgeTimer=setTimeout(loop, 620);
+      if (!screenCamera.classList.contains('hidden')) liveEdgeTimer=setTimeout(loop, 260);
     };
-    liveEdgeTimer=setTimeout(loop, 180);
+    liveEdgeTimer=setTimeout(loop, 120);
   }
 
   async function openCamera() {
@@ -318,11 +324,10 @@
     showToast(autoCaptureEnabled ? '自動拍攝已開啟' : '自動拍攝已關閉');
   });
 
-  el('btnPickPhoto')?.addEventListener('click', () => {
+  el('pickPhotoLabel')?.addEventListener('pointerdown', () => {
+    // Pause analysis before iOS opens its native photo picker.
     stopLiveEdges();
-    // Explicit click is more reliable than a <label for=file> in iOS standalone PWA.
-    el('fileInput').click();
-  });
+  }, {passive:true});
 
   el('fileInput').addEventListener('change', async (e) => {
     const file = e.target.files?.[0];

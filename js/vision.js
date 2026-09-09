@@ -162,42 +162,75 @@ const CardVision = (() => {
     }
   }
 
+  // Lightweight live detector. Intentionally avoids OpenCV/WASM so Safari UI
+  // stays responsive. Full OpenCV detection still runs after the photo is taken.
+  const liveCanvas = document.createElement('canvas');
+  const liveCtx = liveCanvas.getContext('2d', { alpha:false, willReadFrequently:true });
+
+  function bestProjectionPeak(values, from, to) {
+    let best = from, bestVal = -1;
+    const a = Math.max(1, Math.floor(from)), b = Math.min(values.length - 2, Math.ceil(to));
+    for (let i=a;i<=b;i++) if (values[i] > bestVal) { bestVal=values[i]; best=i; }
+    return { index:best, value:bestVal };
+  }
+
   async function detectVideoFrame(videoEl) {
     if (!videoEl?.videoWidth || !videoEl?.videoHeight) return null;
-    const cvx = await getCv(250);
-    if (!cvx) return null;
-    // Keep live analysis intentionally lightweight on iPhone/Safari.
-    // Full-resolution detection is still performed after capture.
-    const maxW = 300;
+    const maxW = 176;
     const scale = Math.min(1, maxW / videoEl.videoWidth);
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(videoEl.videoWidth * scale));
-    canvas.height = Math.max(1, Math.round(videoEl.videoHeight * scale));
-    canvas.getContext('2d', {alpha:false}).drawImage(videoEl,0,0,canvas.width,canvas.height);
-    let src,gray,blur,edges,contours,hierarchy;
-    try {
-      src=cvx.imread(canvas); gray=new cvx.Mat(); blur=new cvx.Mat(); edges=new cvx.Mat(); contours=new cvx.MatVector(); hierarchy=new cvx.Mat();
-      cvx.cvtColor(src,gray,cvx.COLOR_RGBA2GRAY,0);
-      // A tiny blur + Laplacian variance provide a cheap sharpness score.
-      cvx.GaussianBlur(gray,blur,new cvx.Size(3,3),0,0,cvx.BORDER_DEFAULT);
-      const lap = new cvx.Mat();
-      cvx.Laplacian(gray, lap, cvx.CV_64F);
-      const mean = new cvx.Mat(), stddev = new cvx.Mat();
-      cvx.meanStdDev(lap, mean, stddev);
-      const sigma = stddev.doubleAt(0,0);
-      const sharpness = Math.max(0, Math.min(100, Math.round((sigma * sigma) / 5)));
-      lap.delete(); mean.delete(); stddev.delete();
-      cvx.Canny(blur,edges,60,145,3,false);
-      cvx.findContours(edges,contours,hierarchy,cvx.RETR_EXTERNAL,cvx.CHAIN_APPROX_SIMPLE);
-      const area=src.cols*src.rows,candidates=[];
-      for(let i=0;i<contours.size();i++){
-        const cnt=contours.get(i),peri=cvx.arcLength(cnt,true),approx=new cvx.Mat(); cvx.approxPolyDP(cnt,approx,.025*peri,true);
-        if(approx.rows===4&&cvx.isContourConvex(approx)){const pts=matPoints(approx),score=quadrilateralScore(pts,area);if(Number.isFinite(score))candidates.push({pts,score});}
-        approx.delete();cnt.delete();
+    const w = Math.max(96, Math.round(videoEl.videoWidth * scale));
+    const h = Math.max(72, Math.round(videoEl.videoHeight * scale));
+    liveCanvas.width=w; liveCanvas.height=h;
+    liveCtx.drawImage(videoEl,0,0,w,h);
+    const rgba=liveCtx.getImageData(0,0,w,h).data;
+    const gray=new Uint8Array(w*h);
+    let mean=0;
+    for(let i=0,j=0;i<rgba.length;i+=4,j++){
+      const g=(rgba[i]*77 + rgba[i+1]*150 + rgba[i+2]*29) >> 8;
+      gray[j]=g; mean+=g;
+    }
+    mean/=gray.length;
+
+    // Gradient projections: cheap approximation of the four card borders.
+    const vx=new Float32Array(w), hy=new Float32Array(h);
+    let sharpSum=0, sharpN=0;
+    for(let y=1;y<h-1;y++){
+      const row=y*w;
+      for(let x=1;x<w-1;x++){
+        const i=row+x;
+        const dx=Math.abs(gray[i+1]-gray[i-1]);
+        const dy=Math.abs(gray[i+w]-gray[i-w]);
+        vx[x]+=dx; hy[y]+=dy;
+        sharpSum += dx+dy; sharpN++;
       }
-      candidates.sort((a,b)=>b.score-a.score); if(!candidates.length||candidates[0].score<.34)return null;
-      return {confidence:Math.round(Math.min(1,candidates[0].score)*100), sharpness, corners:orderPoints(candidates[0].pts).map(p=>({x:p.x/canvas.width,y:p.y/canvas.height}))};
-    } finally {[src,gray,blur,edges,hierarchy].forEach(m=>{try{m&&m.delete()}catch(_){}});try{contours&&contours.delete()}catch(_){}}
+    }
+    const sharpness=Math.max(0,Math.min(100,Math.round((sharpSum/Math.max(1,sharpN))*2.15)));
+    const left=bestProjectionPeak(vx,w*.04,w*.38);
+    const right=bestProjectionPeak(vx,w*.62,w*.96);
+    const top=bestProjectionPeak(hy,h*.05,h*.45);
+    const bottom=bestProjectionPeak(hy,h*.55,h*.95);
+    const bw=right.index-left.index, bh=bottom.index-top.index;
+    if(bw < w*.42 || bh < h*.20) return null;
+
+    const physicalRatio=(bw/bh)*(h/w)*(videoEl.videoWidth/videoEl.videoHeight);
+    const ratio=Math.max(physicalRatio,1/Math.max(.001,physicalRatio));
+    const ratioScore=Math.max(0,1-Math.abs(ratio-CARD_RATIO)/1.05);
+    const normEdge=((left.value+right.value)/(2*h)+(top.value+bottom.value)/(2*w))/2;
+    const edgeScore=Math.max(0,Math.min(1,(normEdge-8)/28));
+    const brightnessScore=mean>35 && mean<245 ? 1 : .45;
+    const score=.48*edgeScore+.38*ratioScore+.14*brightnessScore;
+    if(score<.34) return null;
+
+    return {
+      confidence:Math.round(Math.min(1,score)*100),
+      sharpness,
+      corners:[
+        {x:left.index/w,y:top.index/h},
+        {x:right.index/w,y:top.index/h},
+        {x:right.index/w,y:bottom.index/h},
+        {x:left.index/w,y:bottom.index/h}
+      ]
+    };
   }
 
   return { detectAndCorrect, detectVideoFrame, getCv };

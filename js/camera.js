@@ -11,11 +11,27 @@ const CardCamera = (() => {
       video: {
         facingMode: { ideal: 'environment' },
         width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        aspectRatio: { ideal: 16 / 9 }
+        height: { ideal: 1440 }
       },
       audio: false
     });
+    const track = stream.getVideoTracks()[0];
+    try {
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      const advanced = [];
+      if (caps.focusMode && Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+        advanced.push({ focusMode: 'continuous' });
+      }
+      // iPhone multi-camera devices can jump into a very tight macro-like field of view.
+      // Prefer the natural 1x view when zoom constraints are exposed by the browser.
+      if (caps.zoom && Number.isFinite(caps.zoom.min) && Number.isFinite(caps.zoom.max)) {
+        const targetZoom = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 1));
+        advanced.push({ zoom: targetZoom });
+      }
+      if (advanced.length) await track.applyConstraints({ advanced });
+    } catch (constraintErr) {
+      console.warn('Camera fine-tuning skipped:', constraintErr);
+    }
     videoEl.srcObject = stream;
     await videoEl.play();
   }
