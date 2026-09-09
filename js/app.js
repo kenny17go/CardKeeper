@@ -15,6 +15,12 @@
   let liveEdgeTimer = null;
   let scanningBack = false;
   let pendingDuplicate = null;
+  let autoCaptureEnabled = true;
+  let liveEdgeBusy = false;
+  let stableSince = 0;
+  let lastLiveCorners = null;
+  let captureInProgress = false;
+  let autoCaptureCooldownUntil = 0;
 
   // ---------- element refs ----------
   const el = (id) => document.getElementById(id);
@@ -176,50 +182,165 @@
   el('btnModeSingle')?.addEventListener('click',()=>setCaptureMode('single'));
   el('btnModeContinuous')?.addEventListener('click',()=>setCaptureMode('continuous'));
 
-  function stopLiveEdges(){ clearInterval(liveEdgeTimer); liveEdgeTimer=null; const c=el('liveEdgeCanvas'); if(c)c.getContext('2d')?.clearRect(0,0,c.width,c.height); }
-  function drawLiveCorners(result){
+  function resetAutoCaptureState() {
+    stableSince = 0;
+    lastLiveCorners = null;
+    const p = el('autoCaptureProgress');
+    if (p) p.style.setProperty('--progress', '0deg');
+  }
+
+  function stopLiveEdges(){
+    clearTimeout(liveEdgeTimer);
+    liveEdgeTimer = null;
+    liveEdgeBusy = false;
+    resetAutoCaptureState();
+    const c=el('liveEdgeCanvas');
+    if(c)c.getContext('2d')?.clearRect(0,0,c.width,c.height);
+  }
+
+  function cornerMotion(a, b) {
+    if (!a || !b || a.length !== 4 || b.length !== 4) return Infinity;
+    return a.reduce((sum, p, i) => sum + Math.hypot(p.x - b[i].x, p.y - b[i].y), 0) / 4;
+  }
+
+  function drawLiveCorners(result, progress = 0){
     const c=el('liveEdgeCanvas'),wrap=video.parentElement;if(!c||!wrap)return;
     const r=wrap.getBoundingClientRect(),dpr=Math.min(2,devicePixelRatio||1);c.width=Math.round(r.width*dpr);c.height=Math.round(r.height*dpr);c.style.width=r.width+'px';c.style.height=r.height+'px';
-    const ctx=c.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,r.width,r.height);if(!result?.corners)return;
+    const ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,r.width,r.height);if(!result?.corners)return;
     const vw=video.videoWidth,vh=video.videoHeight,scale=Math.max(r.width/vw,r.height/vh),dw=vw*scale,dh=vh*scale,ox=(r.width-dw)/2,oy=(r.height-dh)/2;
     const pts=result.corners.map(p=>({x:ox+p.x*dw,y:oy+p.y*dh}));ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));ctx.closePath();ctx.lineWidth=3;ctx.strokeStyle='rgba(52,199,89,.95)';ctx.stroke();
     pts.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,6,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='rgb(52,199,89)';ctx.stroke();});
-    el('guideHint').textContent=`已吸附名片四角 · ${result.confidence}%`;
-  }
-  function startLiveEdges(){
-    stopLiveEdges(); let busy=false;
-    liveEdgeTimer=setInterval(async()=>{if(busy||screenCamera.classList.contains('hidden'))return;busy=true;try{const r=await CardVision.detectVideoFrame(video);if(r)drawLiveCorners(r);else{const c=el('liveEdgeCanvas');c?.getContext('2d')?.clearRect(0,0,c.width,c.height);el('guideHint').textContent='將名片移入畫面，系統會自動吸附四角';}}catch(_){}finally{busy=false;}},450);
-  }
-  async function openCamera() {
-    editingCardId = null;
-    showScreen(screenCamera);
-    try {
-      await CardCamera.start(video);
-      startLiveEdges();
-    } catch (err) {
-      showToast('無法開啟相機，請改用相簿選取');
-      console.error(err);
-    }
+    const sharp = Number.isFinite(result.sharpness) ? ` · 清晰 ${result.sharpness}` : '';
+    el('guideHint').textContent = progress > 0
+      ? `保持不動… ${Math.round(progress*100)}%${sharp}`
+      : `已吸附名片四角 · ${result.confidence}%${sharp}`;
   }
 
-  el('btnShoot').addEventListener('click', async () => {
+  async function shootNow(source = 'manual') {
+    if (captureInProgress) return;
+    captureInProgress = true;
+    autoCaptureCooldownUntil = Date.now() + 1800;
     try {
+      stopLiveEdges();
       const dataUrl = CardCamera.captureFromVideo(video, captureCanvas);
-      stopLiveEdges(); CardCamera.stop();
+      CardCamera.stop();
       await handleCapturedImage(dataUrl);
     } catch (err) {
       console.error(err);
-      showToast('拍照失敗，請再試一次');
+      captureInProgress = false;
+      showToast(source === 'auto' ? '自動拍攝失敗，可直接按快門重試' : '拍照失敗，請再試一次');
+      if (!screenCamera.classList.contains('hidden')) startLiveEdges();
+      return;
     }
+    captureInProgress = false;
+  }
+
+  function startLiveEdges(){
+    stopLiveEdges();
+    const loop = async () => {
+      if (screenCamera.classList.contains('hidden') || !liveEdgeTimer) return;
+      if (liveEdgeBusy || captureInProgress) {
+        liveEdgeTimer=setTimeout(loop, 220);
+        return;
+      }
+      liveEdgeBusy = true;
+      try {
+        const r=await CardVision.detectVideoFrame(video);
+        if(r){
+          const motion = cornerMotion(r.corners, lastLiveCorners);
+          const clearEnough = (r.sharpness ?? 0) >= 24;
+          const confident = r.confidence >= 40;
+          const steady = motion < 0.018;
+          const qualifies = autoCaptureEnabled && clearEnough && confident && steady && Date.now() >= autoCaptureCooldownUntil;
+          if (qualifies) {
+            if (!stableSince) stableSince = Date.now();
+            const progress = Math.min(1, (Date.now() - stableSince) / 900);
+            drawLiveCorners(r, progress);
+            const p=el('autoCaptureProgress'); if(p)p.style.setProperty('--progress', `${Math.round(progress*360)}deg`);
+            if (progress >= 1) {
+              stableSince = 0;
+              lastLiveCorners = null;
+              await shootNow('auto');
+              return;
+            }
+          } else {
+            stableSince = 0;
+            const p=el('autoCaptureProgress'); if(p)p.style.setProperty('--progress','0deg');
+            drawLiveCorners(r, 0);
+            if (autoCaptureEnabled && (!clearEnough || !steady)) {
+              el('guideHint').textContent = !clearEnough ? '已找到名片，請保持清晰' : '已找到名片，請保持不動';
+            }
+          }
+          lastLiveCorners = r.corners;
+        } else {
+          resetAutoCaptureState();
+          const c=el('liveEdgeCanvas');c?.getContext('2d')?.clearRect(0,0,c.width,c.height);
+          el('guideHint').textContent='找不到四角也可直接拍照，或從相簿選取';
+        }
+      }catch(err){
+        console.warn('Live edge detection skipped:', err);
+        resetAutoCaptureState();
+        el('guideHint').textContent='自動找邊暫不可用，可直接拍照或選相簿';
+      }finally{
+        liveEdgeBusy=false;
+      }
+      // Deliberately relaxed cadence: keeps Safari controls responsive.
+      if (!screenCamera.classList.contains('hidden')) liveEdgeTimer=setTimeout(loop, 620);
+    };
+    liveEdgeTimer=setTimeout(loop, 180);
+  }
+
+  async function openCamera() {
+    editingCardId = null;
+    showScreen(screenCamera);
+    el('guideHint').textContent='相機準備中…';
+    try {
+      await CardCamera.start(video);
+      el('guideHint').textContent='找不到四角也可直接拍照';
+      startLiveEdges();
+    } catch (err) {
+      stopLiveEdges();
+      showToast('無法開啟相機，請改用相簿選取');
+      el('guideHint').textContent='相機無法啟用，請點右下角「相簿」';
+      console.error(err);
+    }
+  }
+
+  el('btnShoot').addEventListener('click', () => shootNow('manual'));
+
+  el('btnAutoCapture')?.addEventListener('click', () => {
+    autoCaptureEnabled = !autoCaptureEnabled;
+    const b=el('btnAutoCapture');
+    b.classList.toggle('active', autoCaptureEnabled);
+    b.setAttribute('aria-pressed', String(autoCaptureEnabled));
+    b.textContent = `自動拍攝：${autoCaptureEnabled ? '開' : '關'}`;
+    resetAutoCaptureState();
+    showToast(autoCaptureEnabled ? '自動拍攝已開啟' : '自動拍攝已關閉');
+  });
+
+  el('btnPickPhoto')?.addEventListener('click', () => {
+    stopLiveEdges();
+    // Explicit click is more reliable than a <label for=file> in iOS standalone PWA.
+    el('fileInput').click();
   });
 
   el('fileInput').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file) return;
-    CardCamera.stop();
-    const dataUrl = await CardCamera.fileToDataUrl(file);
-    await handleCapturedImage(dataUrl);
+    if (!file) {
+      if (!screenCamera.classList.contains('hidden') && video.srcObject) startLiveEdges();
+      return;
+    }
+    try {
+      stopLiveEdges();
+      CardCamera.stop();
+      const dataUrl = await CardCamera.fileToDataUrl(file);
+      await handleCapturedImage(dataUrl);
+    } catch (err) {
+      console.error(err);
+      showToast('無法讀取照片，請改選另一張圖片');
+      if (!screenCamera.classList.contains('hidden')) openCamera();
+    }
   });
 
   function setProcessingStep(step) {

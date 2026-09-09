@@ -166,7 +166,9 @@ const CardVision = (() => {
     if (!videoEl?.videoWidth || !videoEl?.videoHeight) return null;
     const cvx = await getCv(250);
     if (!cvx) return null;
-    const maxW = 520;
+    // Keep live analysis intentionally lightweight on iPhone/Safari.
+    // Full-resolution detection is still performed after capture.
+    const maxW = 300;
     const scale = Math.min(1, maxW / videoEl.videoWidth);
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(videoEl.videoWidth * scale));
@@ -175,8 +177,18 @@ const CardVision = (() => {
     let src,gray,blur,edges,contours,hierarchy;
     try {
       src=cvx.imread(canvas); gray=new cvx.Mat(); blur=new cvx.Mat(); edges=new cvx.Mat(); contours=new cvx.MatVector(); hierarchy=new cvx.Mat();
-      cvx.cvtColor(src,gray,cvx.COLOR_RGBA2GRAY,0); cvx.GaussianBlur(gray,blur,new cvx.Size(5,5),0,0,cvx.BORDER_DEFAULT); cvx.Canny(blur,edges,55,150,3,false);
-      cvx.findContours(edges,contours,hierarchy,cvx.RETR_LIST,cvx.CHAIN_APPROX_SIMPLE);
+      cvx.cvtColor(src,gray,cvx.COLOR_RGBA2GRAY,0);
+      // A tiny blur + Laplacian variance provide a cheap sharpness score.
+      cvx.GaussianBlur(gray,blur,new cvx.Size(3,3),0,0,cvx.BORDER_DEFAULT);
+      const lap = new cvx.Mat();
+      cvx.Laplacian(gray, lap, cvx.CV_64F);
+      const mean = new cvx.Mat(), stddev = new cvx.Mat();
+      cvx.meanStdDev(lap, mean, stddev);
+      const sigma = stddev.doubleAt(0,0);
+      const sharpness = Math.max(0, Math.min(100, Math.round((sigma * sigma) / 5)));
+      lap.delete(); mean.delete(); stddev.delete();
+      cvx.Canny(blur,edges,60,145,3,false);
+      cvx.findContours(edges,contours,hierarchy,cvx.RETR_EXTERNAL,cvx.CHAIN_APPROX_SIMPLE);
       const area=src.cols*src.rows,candidates=[];
       for(let i=0;i<contours.size();i++){
         const cnt=contours.get(i),peri=cvx.arcLength(cnt,true),approx=new cvx.Mat(); cvx.approxPolyDP(cnt,approx,.025*peri,true);
@@ -184,7 +196,7 @@ const CardVision = (() => {
         approx.delete();cnt.delete();
       }
       candidates.sort((a,b)=>b.score-a.score); if(!candidates.length||candidates[0].score<.34)return null;
-      return {confidence:Math.round(Math.min(1,candidates[0].score)*100), corners:orderPoints(candidates[0].pts).map(p=>({x:p.x/canvas.width,y:p.y/canvas.height}))};
+      return {confidence:Math.round(Math.min(1,candidates[0].score)*100), sharpness, corners:orderPoints(candidates[0].pts).map(p=>({x:p.x/canvas.width,y:p.y/canvas.height}))};
     } finally {[src,gray,blur,edges,hierarchy].forEach(m=>{try{m&&m.delete()}catch(_){}});try{contours&&contours.delete()}catch(_){}}
   }
 
