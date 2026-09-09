@@ -5,17 +5,42 @@
 const CardOCR = (() => {
   let worker = null;
 
+  let workerReady = null; // guards concurrent getWorker() calls from racing createWorker twice
+
   async function getWorker(onProgress) {
     if (worker) return worker;
-    worker = await Tesseract.createWorker(['chi_tra', 'eng'], 1, {
-      logger: (m) => onProgress && m.status && onProgress(m)
-    });
-    await worker.setParameters({
-      tessedit_pageseg_mode: '11',
-      preserve_interword_spaces: '1',
-      user_defined_dpi: '300'
-    });
-    return worker;
+    if (!workerReady) {
+      workerReady = (async () => {
+        const w = await Tesseract.createWorker(['chi_tra', 'eng'], 1, {
+          logger: (m) => onProgress && m.status && onProgress(m)
+        });
+        await w.setParameters({
+          tessedit_pageseg_mode: '11',
+          preserve_interword_spaces: '1',
+          user_defined_dpi: '300'
+        });
+        worker = w;
+        return w;
+      })();
+    }
+    try {
+      return await workerReady;
+    } finally {
+      workerReady = null;
+    }
+  }
+
+  // Force-discard the current worker. Call this whenever a recognize() call
+  // was abandoned (timeout / user cancel) — a Tesseract worker processes jobs
+  // one at a time, so an abandoned-but-still-running job would otherwise sit
+  // in the queue forever and silently freeze every future scan.
+  async function reset() {
+    const w = worker;
+    worker = null;
+    workerReady = null;
+    if (w) {
+      try { await w.terminate(); } catch (_) { /* already dead, ignore */ }
+    }
   }
 
   function loadImage(dataUrl) {
@@ -99,5 +124,5 @@ const CardOCR = (() => {
     };
   }
 
-  return { recognize, makeVariants };
+  return { recognize, makeVariants, reset };
 })();

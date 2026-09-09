@@ -175,6 +175,7 @@
 
   el('btnCancelProcessing')?.addEventListener('click', async () => {
     processingCancelled = true; processingRunId++;
+    CardOCR.reset().catch(() => {}); // don't leave an abandoned OCR job hogging the worker queue
     showScreen(screenCamera);
     el('guideHint').textContent = '處理已取消，可重新拍攝';
     try { await CardCamera.start(video); startLiveEdges(); } catch (_) { el('guideHint').textContent='請使用相簿選取照片'; }
@@ -182,6 +183,7 @@
 
   el('btnSkipProcessing')?.addEventListener('click', async () => {
     processingCancelled = true; processingRunId++;
+    CardOCR.reset().catch(() => {}); // same reasoning: skip = abandon whatever OCR was in flight
     const img = el('processingPreview')?.src || pendingCapture?.imageDataUrl || '';
     if (img) await openManualConfirmFromImage(img, img, {detected:false,confidence:0,reason:'user skipped'});
     else { showScreen(screenCamera); try { await CardCamera.start(video); startLiveEdges(); } catch (_) {} }
@@ -470,6 +472,10 @@
       } catch (ocrErr) {
         if (ocrErr?.name === 'AbortError') throw ocrErr;
         console.warn('OCR fallback:', ocrErr);
+        // The recognize() call that just timed out may still be running inside
+        // the Tesseract worker (withTimeout only abandons our wait for it).
+        // Terminate it now so it doesn't block every subsequent scan's OCR call.
+        CardOCR.reset().catch(() => {});
         assertProcessing(runId);
         showToast('OCR 未完成，已改為手動確認');
         await openManualConfirmFromImage(workingImage, imageDataUrl, visionMeta);
