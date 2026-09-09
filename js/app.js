@@ -21,6 +21,8 @@
   let lastLiveCorners = null;
   let captureInProgress = false;
   let autoCaptureCooldownUntil = 0;
+  let processingRunId = 0;
+  let processingCancelled = false;
 
   // ---------- element refs ----------
   const el = (id) => document.getElementById(id);
@@ -171,6 +173,20 @@
   el('btnCapture').addEventListener('click', openCamera);
   el('btnCloseCamera').addEventListener('click', () => { stopLiveEdges(); CardCamera.stop(); closeAllScreens(); });
 
+  el('btnCancelProcessing')?.addEventListener('click', async () => {
+    processingCancelled = true; processingRunId++;
+    showScreen(screenCamera);
+    el('guideHint').textContent = '處理已取消，可重新拍攝';
+    try { await CardCamera.start(video); startLiveEdges(); } catch (_) { el('guideHint').textContent='請使用相簿選取照片'; }
+  });
+
+  el('btnSkipProcessing')?.addEventListener('click', async () => {
+    processingCancelled = true; processingRunId++;
+    const img = el('processingPreview')?.src || pendingCapture?.imageDataUrl || '';
+    if (img) await openManualConfirmFromImage(img, img, {detected:false,confidence:0,reason:'user skipped'});
+    else { showScreen(screenCamera); try { await CardCamera.start(video); startLiveEdges(); } catch (_) {} }
+  });
+
 
   function setCaptureMode(mode) {
     captureMode = mode;
@@ -222,7 +238,7 @@
     autoCaptureCooldownUntil = Date.now() + 1800;
     try {
       stopLiveEdges();
-      const dataUrl = CardCamera.captureFromVideo(video, captureCanvas);
+      const dataUrl = CardCamera.captureGuide(video, captureCanvas, cardGuide, 1800);
       CardCamera.stop();
       await handleCapturedImage(dataUrl);
     } catch (err) {
@@ -357,69 +373,131 @@
     });
   }
 
+  function isIOSLike() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  function withTimeout(promise, ms, label='處理') {
+    let timer;
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(label + '逾時')), ms); })
+    ]).finally(() => clearTimeout(timer));
+  }
+
+  function assertProcessing(runId) {
+    if (processingCancelled || runId !== processingRunId) throw new DOMException('Processing cancelled', 'AbortError');
+  }
+
+  async function openManualConfirmFromImage(imageDataUrl, originalImageDataUrl=imageDataUrl, visionMeta={detected:false,confidence:0}) {
+    const parsed = CardParse.parse('');
+    let thumb = '';
+    try { thumb = await withTimeout(CardCamera.makeThumbnail(imageDataUrl), 3500, '縮圖'); } catch (_) {}
+    pendingCapture = { imageDataUrl, originalImageDataUrl, thumb, rawText:'', parsed, visionMeta };
+    openConfirmScreen(parsed, imageDataUrl, '', null, visionMeta);
+  }
+
   async function handleCapturedImage(imageDataUrl) {
+    const runId = ++processingRunId;
+    processingCancelled = false;
     showScreen(screenProcessing);
     el('processingPreview').src = imageDataUrl;
-    el('processingLabel').textContent = '正在偵測名片邊界…';
-    el('processingSub').textContent = '自動找四角並校正透視';
+    el('processingLabel').textContent = '正在準備名片影像…';
+    el('processingSub').textContent = '安全模式：任何步驟失敗都會自動繼續';
     setProcessingStep('edge');
 
     let workingImage = imageDataUrl;
-    let visionMeta = { detected: false, confidence: 0 };
+    let visionMeta = { detected: false, confidence: 0, reason: 'safe fallback' };
+
     try {
-      visionMeta = await CardVision.detectAndCorrect(imageDataUrl, (status) => {
-        el('processingLabel').textContent = status;
-        if (status.includes('校正')) setProcessingStep('warp');
-      });
-      if (visionMeta.detected) {
-        workingImage = visionMeta.imageDataUrl;
-        el('processingPreview').src = workingImage;
-        el('processingSub').textContent = `已找到名片邊界（信心 ${visionMeta.confidence}%）`;
+      assertProcessing(runId);
+      // iPhone/iPad: OpenCV.js can monopolize Safari's main thread after capture.
+      // Use the guide-cropped photo immediately; desktop keeps a short best-effort correction.
+      if (isIOSLike()) {
+        el('processingLabel').textContent = '已擷取名片範圍';
+        el('processingSub').textContent = 'iPhone 安全模式：略過高負載透視校正';
+        setProcessingStep('warp');
+        await new Promise(r => setTimeout(r, 80));
       } else {
-        el('processingSub').textContent = '未找到可靠四角，改用原始裁切影像';
-      }
-    } catch (visionErr) {
-      console.warn('Vision fallback:', visionErr);
-      el('processingSub').textContent = '自動找邊未完成，改用原始裁切影像';
-    }
-
-    if (scanningBack) {
-      scanningBack = false;
-      const thumb = await CardCamera.makeThumbnail(workingImage);
-      pendingCapture = pendingCapture || { parsed: CardParse.parse(''), rawText:'', imageDataUrl:'', thumb:'' };
-      pendingCapture.backPhoto = workingImage; pendingCapture.backThumb = thumb;
-      openConfirmScreen(pendingCapture.parsed || {}, pendingCapture.imageDataUrl, pendingCapture.rawText || '', pendingCapture.ocrMeta?.confidence ?? null, pendingCapture.visionMeta);
-      showToast('已加入名片背面');
-      return;
-    }
-
-    try {
-      setProcessingStep('ocr');
-      el('processingLabel').textContent = '正在進行第二代 OCR…';
-      const ocrResult = await CardOCR.recognize(workingImage, (m) => {
-        if (m.status === 'ocr-pass') {
-          el('processingLabel').textContent = `OCR 第 ${m.pass}/${m.total} 輪…`;
-          el('processingSub').textContent = '比對不同影像強化策略';
-        } else if (m.status === 'recognizing text') {
-          el('processingLabel').textContent = `辨識文字… ${Math.round((m.progress || 0) * 100)}%`;
+        try {
+          visionMeta = await withTimeout(CardVision.detectAndCorrect(imageDataUrl, (status) => {
+            if (runId !== processingRunId) return;
+            el('processingLabel').textContent = status;
+            if (status.includes('校正')) setProcessingStep('warp');
+          }), 6500, '找邊');
+          assertProcessing(runId);
+          if (visionMeta.detected) {
+            workingImage = visionMeta.imageDataUrl;
+            el('processingPreview').src = workingImage;
+            el('processingSub').textContent = `已找到名片邊界（信心 ${visionMeta.confidence}%）`;
+          } else {
+            el('processingSub').textContent = '未找到可靠四角，直接使用原始影像';
+          }
+        } catch (visionErr) {
+          if (visionErr?.name === 'AbortError') throw visionErr;
+          console.warn('Vision fallback:', visionErr);
+          el('processingSub').textContent = '找邊失敗或逾時，直接使用原始影像';
         }
-      });
+      }
 
+      assertProcessing(runId);
+      if (scanningBack) {
+        scanningBack = false;
+        let thumb='';
+        try { thumb = await withTimeout(CardCamera.makeThumbnail(workingImage), 3500, '縮圖'); } catch (_) {}
+        pendingCapture = pendingCapture || { parsed: CardParse.parse(''), rawText:'', imageDataUrl:'', thumb:'' };
+        pendingCapture.backPhoto = workingImage; pendingCapture.backThumb = thumb;
+        openConfirmScreen(pendingCapture.parsed || {}, pendingCapture.imageDataUrl, pendingCapture.rawText || '', pendingCapture.ocrMeta?.confidence ?? null, pendingCapture.visionMeta);
+        showToast('已加入名片背面');
+        return;
+      }
+
+      setProcessingStep('ocr');
+      el('processingLabel').textContent = '正在辨識名片文字…';
+      el('processingSub').textContent = '若辨識服務過久，會自動進入手動確認';
+
+      let ocrResult;
+      try {
+        ocrResult = await withTimeout(CardOCR.recognize(workingImage, (m) => {
+          if (runId !== processingRunId) return;
+          if (m.status === 'ocr-pass') {
+            el('processingLabel').textContent = `OCR 第 ${m.pass}/${m.total} 輪…`;
+            el('processingSub').textContent = '比對不同影像強化策略';
+          } else if (m.status === 'recognizing text') {
+            el('processingLabel').textContent = `辨識文字… ${Math.round((m.progress || 0) * 100)}%`;
+          }
+        }), 22000, 'OCR');
+      } catch (ocrErr) {
+        if (ocrErr?.name === 'AbortError') throw ocrErr;
+        console.warn('OCR fallback:', ocrErr);
+        assertProcessing(runId);
+        showToast('OCR 未完成，已改為手動確認');
+        await openManualConfirmFromImage(workingImage, imageDataUrl, visionMeta);
+        return;
+      }
+
+      assertProcessing(runId);
       setProcessingStep('parse');
-      el('processingLabel').textContent = '正在整理姓名與聯絡欄位…';
-      el('processingSub').textContent = `完成 ${ocrResult.passes} 輪 OCR，自動選擇最佳結果`;
-      const rawText = ocrResult.text;
+      el('processingLabel').textContent = '正在整理聯絡欄位…';
+      const rawText = ocrResult.text || '';
       const parsed = CardParse.parse(rawText);
-      const thumb = await CardCamera.makeThumbnail(workingImage);
+      let thumb='';
+      try { thumb = await withTimeout(CardCamera.makeThumbnail(workingImage), 3500, '縮圖'); } catch (_) {}
+      assertProcessing(runId);
       pendingCapture = { imageDataUrl: workingImage, originalImageDataUrl: imageDataUrl, thumb, rawText, parsed, visionMeta, ocrMeta: ocrResult };
       openConfirmScreen(parsed, workingImage, rawText, ocrResult.confidence, visionMeta);
     } catch (err) {
+      if (err?.name === 'AbortError') return;
       console.error(err);
-      showToast('OCR 辨識失敗，請手動輸入');
-      const parsed = CardParse.parse('');
-      const thumb = await CardCamera.makeThumbnail(workingImage);
-      pendingCapture = { imageDataUrl: workingImage, originalImageDataUrl: imageDataUrl, thumb, rawText: '', parsed, visionMeta };
-      openConfirmScreen(parsed, workingImage, '', null, visionMeta);
+      try {
+        await openManualConfirmFromImage(workingImage || imageDataUrl, imageDataUrl, visionMeta);
+        showToast('處理發生問題，已進入手動確認');
+      } catch (fallbackErr) {
+        console.error('Manual fallback failed:', fallbackErr);
+        showToast('影像處理失敗，請返回相機重拍');
+        showScreen(screenCamera);
+        try { await CardCamera.start(video); startLiveEdges(); } catch (_) {}
+      }
     }
   }
 
