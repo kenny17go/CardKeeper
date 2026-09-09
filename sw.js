@@ -2,7 +2,7 @@
    sw.js — app-shell cache so CardKeeper works offline
    (all card DATA lives in IndexedDB, not in this cache)
    ========================================================= */
-const CACHE_NAME = 'cardkeeper-shell-v4';
+const CACHE_NAME = 'cardkeeper-shell-v4.1';
 const SHELL_FILES = [
   './',
   './index.html',

@@ -81,11 +81,19 @@
       <p id="guideHint">正在尋找名片邊界…</p>
     </div>
   </div>
-  <div class="capture-mode-bar"><button id="btnModeSingle" class="capture-mode active">單張</button><button id="btnModeContinuous" class="capture-mode">連續掃描</button><span id="batchCount" class="batch-count hidden">0 張</span></div>
+  <div class="capture-mode-bar">
+    <button id="btnModeSingle" class="capture-mode active">單張</button>
+    <button id="btnModeContinuous" class="capture-mode">連續掃描</button>
+    <button id="btnAutoCapture" class="capture-mode active" aria-pressed="true">自動拍攝：開</button>
+    <span id="batchCount" class="batch-count hidden">0 張</span>
+  </div>
   <div class="camera-actions">
-    <button id="btnCloseCamera" class="btn-ghost-round">取消</button>
-    <button id="btnShoot" class="shutter" aria-label="拍照"></button>
-    <label class="btn-ghost-round" for="fileInput">相簿</label>
+    <button id="btnCloseCamera" class="btn-ghost-round" type="button">取消</button>
+    <div class="shutter-wrap">
+      <button id="btnShoot" class="shutter" type="button" aria-label="拍照"></button>
+      <span id="autoCaptureProgress" class="auto-capture-progress" aria-hidden="true"></span>
+    </div>
+    <button id="btnPickPhoto" class="btn-ghost-round" type="button">相簿</button>
     <input id="fileInput" type="file" accept="image/*" class="hidden">
   </div>
 </section>
