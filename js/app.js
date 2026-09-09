@@ -9,7 +9,12 @@
   let activeTab = 'all';       // 'all' | 'fav' | category name
   let searchQuery = '';
   let pendingCapture = null;   // { imageDataUrl, thumbDataUrl, rawText, parsed }
-  let editingCardId = null;    // set when confirm screen is editing an existing card
+  let editingCardId = null;
+  let captureMode = 'single';
+  let batchSaved = 0;
+  let liveEdgeTimer = null;
+  let scanningBack = false;
+  let pendingDuplicate = null;
 
   // ---------- element refs ----------
   const el = (id) => document.getElementById(id);
@@ -27,6 +32,7 @@
 
   const video = el('video');
   const captureCanvas = el('captureCanvas');
+  const cardGuide = el('cardGuide');
 
   // ===================================================
   // Utilities
@@ -50,6 +56,7 @@
   function closeAllScreens() {
     showScreen(null);
     CardCamera.stop();
+    stopLiveEdges?.();
   }
 
   function escapeHtml(s) {
@@ -63,6 +70,10 @@
   // ===================================================
   async function loadCards() {
     allCards = await CardDB.getAll();
+    const weekAgo = Date.now() - 7*86400000;
+    if (el('statTotal')) el('statTotal').textContent = allCards.length;
+    if (el('statFav')) el('statFav').textContent = allCards.filter(c=>c.favorite).length;
+    if (el('statRecent')) el('statRecent').textContent = allCards.filter(c=>(c.createdAt||0)>=weekAgo).length;
     renderTabs();
     renderList();
   }
@@ -102,7 +113,7 @@
 
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      list = list.filter(c => [c.name, c.nameEn, c.company, c.title, c.mobile, c.phone, c.email, c.address, c.category]
+      list = list.filter(c => [c.name, c.nameEn, c.company, c.title, c.mobile, c.phone, c.phone2, c.fax, c.email, c.address, c.category]
         .filter(Boolean).some(v => v.toLowerCase().includes(q)));
     }
     return list;
@@ -119,7 +130,7 @@
     }
 
     cardList.innerHTML = list.map(c => `
-      <article class="card-item" data-id="${c.id}">
+      <article class="card-item" data-id="${escapeHtml(c.id)}">
         <div class="tab">${escapeHtml(c.category || '未分類')}</div>
         ${c.favorite ? '<div class="fav-star">⭐</div>' : ''}
         <div class="card-row">
@@ -152,13 +163,39 @@
   // Camera flow
   // ===================================================
   el('btnCapture').addEventListener('click', openCamera);
-  el('btnCloseCamera').addEventListener('click', () => { CardCamera.stop(); closeAllScreens(); });
+  el('btnCloseCamera').addEventListener('click', () => { stopLiveEdges(); CardCamera.stop(); closeAllScreens(); });
 
+
+  function setCaptureMode(mode) {
+    captureMode = mode;
+    el('btnModeSingle')?.classList.toggle('active', mode === 'single');
+    el('btnModeContinuous')?.classList.toggle('active', mode === 'continuous');
+    el('batchCount')?.classList.toggle('hidden', mode !== 'continuous');
+    el('btnSaveNext')?.classList.toggle('hidden', mode !== 'continuous');
+  }
+  el('btnModeSingle')?.addEventListener('click',()=>setCaptureMode('single'));
+  el('btnModeContinuous')?.addEventListener('click',()=>setCaptureMode('continuous'));
+
+  function stopLiveEdges(){ clearInterval(liveEdgeTimer); liveEdgeTimer=null; const c=el('liveEdgeCanvas'); if(c)c.getContext('2d')?.clearRect(0,0,c.width,c.height); }
+  function drawLiveCorners(result){
+    const c=el('liveEdgeCanvas'),wrap=video.parentElement;if(!c||!wrap)return;
+    const r=wrap.getBoundingClientRect(),dpr=Math.min(2,devicePixelRatio||1);c.width=Math.round(r.width*dpr);c.height=Math.round(r.height*dpr);c.style.width=r.width+'px';c.style.height=r.height+'px';
+    const ctx=c.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,r.width,r.height);if(!result?.corners)return;
+    const vw=video.videoWidth,vh=video.videoHeight,scale=Math.max(r.width/vw,r.height/vh),dw=vw*scale,dh=vh*scale,ox=(r.width-dw)/2,oy=(r.height-dh)/2;
+    const pts=result.corners.map(p=>({x:ox+p.x*dw,y:oy+p.y*dh}));ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));ctx.closePath();ctx.lineWidth=3;ctx.strokeStyle='rgba(52,199,89,.95)';ctx.stroke();
+    pts.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,6,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='rgb(52,199,89)';ctx.stroke();});
+    el('guideHint').textContent=`已吸附名片四角 · ${result.confidence}%`;
+  }
+  function startLiveEdges(){
+    stopLiveEdges(); let busy=false;
+    liveEdgeTimer=setInterval(async()=>{if(busy||screenCamera.classList.contains('hidden'))return;busy=true;try{const r=await CardVision.detectVideoFrame(video);if(r)drawLiveCorners(r);else{const c=el('liveEdgeCanvas');c?.getContext('2d')?.clearRect(0,0,c.width,c.height);el('guideHint').textContent='將名片移入畫面，系統會自動吸附四角';}}catch(_){}finally{busy=false;}},450);
+  }
   async function openCamera() {
     editingCardId = null;
     showScreen(screenCamera);
     try {
       await CardCamera.start(video);
+      startLiveEdges();
     } catch (err) {
       showToast('無法開啟相機，請改用相簿選取');
       console.error(err);
@@ -168,7 +205,7 @@
   el('btnShoot').addEventListener('click', async () => {
     try {
       const dataUrl = CardCamera.captureFromVideo(video, captureCanvas);
-      CardCamera.stop();
+      stopLiveEdges(); CardCamera.stop();
       await handleCapturedImage(dataUrl);
     } catch (err) {
       console.error(err);
@@ -185,33 +222,78 @@
     await handleCapturedImage(dataUrl);
   });
 
+  function setProcessingStep(step) {
+    const order = ['edge','warp','ocr','parse'];
+    const active = Math.max(0, order.indexOf(step));
+    el('processingSteps')?.querySelectorAll('span').forEach((node, i) => {
+      node.classList.toggle('done', i < active);
+      node.classList.toggle('active', i === active);
+    });
+  }
+
   async function handleCapturedImage(imageDataUrl) {
     showScreen(screenProcessing);
     el('processingPreview').src = imageDataUrl;
-    el('processingLabel').textContent = '正在讀取名片文字…';
-    el('processingSub').textContent = '啟動 OCR 引擎（首次使用需下載語言檔）';
+    el('processingLabel').textContent = '正在偵測名片邊界…';
+    el('processingSub').textContent = '自動找四角並校正透視';
+    setProcessingStep('edge');
+
+    let workingImage = imageDataUrl;
+    let visionMeta = { detected: false, confidence: 0 };
+    try {
+      visionMeta = await CardVision.detectAndCorrect(imageDataUrl, (status) => {
+        el('processingLabel').textContent = status;
+        if (status.includes('校正')) setProcessingStep('warp');
+      });
+      if (visionMeta.detected) {
+        workingImage = visionMeta.imageDataUrl;
+        el('processingPreview').src = workingImage;
+        el('processingSub').textContent = `已找到名片邊界（信心 ${visionMeta.confidence}%）`;
+      } else {
+        el('processingSub').textContent = '未找到可靠四角，改用原始裁切影像';
+      }
+    } catch (visionErr) {
+      console.warn('Vision fallback:', visionErr);
+      el('processingSub').textContent = '自動找邊未完成，改用原始裁切影像';
+    }
+
+    if (scanningBack) {
+      scanningBack = false;
+      const thumb = await CardCamera.makeThumbnail(workingImage);
+      pendingCapture = pendingCapture || { parsed: CardParse.parse(''), rawText:'', imageDataUrl:'', thumb:'' };
+      pendingCapture.backPhoto = workingImage; pendingCapture.backThumb = thumb;
+      openConfirmScreen(pendingCapture.parsed || {}, pendingCapture.imageDataUrl, pendingCapture.rawText || '', pendingCapture.ocrMeta?.confidence ?? null, pendingCapture.visionMeta);
+      showToast('已加入名片背面');
+      return;
+    }
 
     try {
-      const rawText = await CardOCR.recognize(imageDataUrl, (m) => {
-        if (m.status === 'recognizing text') {
-          el('processingLabel').textContent = `辨識中… ${Math.round((m.progress || 0) * 100)}%`;
-          el('processingSub').textContent = '正在分析中英文字元';
-        } else if (m.status) {
-          el('processingSub').textContent = m.status;
+      setProcessingStep('ocr');
+      el('processingLabel').textContent = '正在進行第二代 OCR…';
+      const ocrResult = await CardOCR.recognize(workingImage, (m) => {
+        if (m.status === 'ocr-pass') {
+          el('processingLabel').textContent = `OCR 第 ${m.pass}/${m.total} 輪…`;
+          el('processingSub').textContent = '比對不同影像強化策略';
+        } else if (m.status === 'recognizing text') {
+          el('processingLabel').textContent = `辨識文字… ${Math.round((m.progress || 0) * 100)}%`;
         }
       });
 
+      setProcessingStep('parse');
+      el('processingLabel').textContent = '正在整理姓名與聯絡欄位…';
+      el('processingSub').textContent = `完成 ${ocrResult.passes} 輪 OCR，自動選擇最佳結果`;
+      const rawText = ocrResult.text;
       const parsed = CardParse.parse(rawText);
-      const thumb = await CardCamera.makeThumbnail(imageDataUrl);
-      pendingCapture = { imageDataUrl, thumb, rawText, parsed };
-      openConfirmScreen(parsed, imageDataUrl, rawText);
+      const thumb = await CardCamera.makeThumbnail(workingImage);
+      pendingCapture = { imageDataUrl: workingImage, originalImageDataUrl: imageDataUrl, thumb, rawText, parsed, visionMeta, ocrMeta: ocrResult };
+      openConfirmScreen(parsed, workingImage, rawText, ocrResult.confidence, visionMeta);
     } catch (err) {
       console.error(err);
       showToast('OCR 辨識失敗，請手動輸入');
       const parsed = CardParse.parse('');
-      const thumb = await CardCamera.makeThumbnail(imageDataUrl);
-      pendingCapture = { imageDataUrl, thumb, rawText: '', parsed };
-      openConfirmScreen(parsed, imageDataUrl, '');
+      const thumb = await CardCamera.makeThumbnail(workingImage);
+      pendingCapture = { imageDataUrl: workingImage, originalImageDataUrl: imageDataUrl, thumb, rawText: '', parsed, visionMeta };
+      openConfirmScreen(parsed, workingImage, '', null, visionMeta);
     }
   }
 
@@ -220,14 +302,25 @@
   // ===================================================
   const cardForm = el('cardForm');
 
-  function openConfirmScreen(parsed, imageDataUrl, rawText) {
+  function openConfirmScreen(parsed, imageDataUrl, rawText, confidence = null, visionMeta = null) {
     cardForm.reset();
-    for (const key of ['name','nameEn','company','title','mobile','phone','email','website','address','category','note']) {
+    for (const key of ['name','nameEn','company','title','mobile','phone','phone2','fax','email','website','address','category','note']) {
       if (cardForm.elements[key]) cardForm.elements[key].value = parsed[key] || '';
     }
     cardForm.elements.favorite.checked = !!parsed.favorite;
     el('confirmThumb').src = imageDataUrl || '';
+    const back = pendingCapture?.backPhoto || parsed.backPhoto || '';
+    el('backPreviewRow')?.classList.toggle('hidden', !back); if(back) el('confirmBackThumb').src=back;
     el('rawOcrText').textContent = rawText || '（無文字）';
+    const q = el('ocrQuality');
+    if (q) {
+      if (confidence === null) q.textContent = '辨識品質：已儲存資料';
+      else {
+        const label = confidence >= 80 ? '佳' : confidence >= 60 ? '普通，建議確認' : '偏低，建議手動校正';
+        q.textContent = `辨識品質：${label}（OCR ${confidence}%${visionMeta?.detected ? ` · 找邊 ${visionMeta.confidence}%` : ' · 手動框裁切'}）`;
+        q.dataset.level = confidence >= 80 ? 'good' : confidence >= 60 ? 'mid' : 'low';
+      }
+    }
     refreshCategoryDatalist();
     showScreen(screenConfirm);
   }
@@ -256,6 +349,8 @@
       title: (fd.get('title') || '').trim(),
       mobile: (fd.get('mobile') || '').trim(),
       phone: (fd.get('phone') || '').trim(),
+      phone2: (fd.get('phone2') || '').trim(),
+      fax: (fd.get('fax') || '').trim(),
       email: (fd.get('email') || '').trim(),
       website: (fd.get('website') || '').trim(),
       address: (fd.get('address') || '').trim(),
@@ -265,6 +360,8 @@
       rawText: pendingCapture ? pendingCapture.rawText : (editingCardId ? (await CardDB.get(editingCardId))?.rawText : ''),
       photo: pendingCapture ? pendingCapture.imageDataUrl : (editingCardId ? (await CardDB.get(editingCardId))?.photo : ''),
       thumb: pendingCapture ? pendingCapture.thumb : (editingCardId ? (await CardDB.get(editingCardId))?.thumb : ''),
+      backPhoto: pendingCapture?.backPhoto || (editingCardId ? (await CardDB.get(editingCardId))?.backPhoto : ''),
+      backThumb: pendingCapture?.backThumb || (editingCardId ? (await CardDB.get(editingCardId))?.backThumb : ''),
       createdAt: editingCardId ? (await CardDB.get(editingCardId))?.createdAt || now : now,
       updatedAt: now
     };
@@ -274,14 +371,40 @@
       return;
     }
 
-    await CardDB.put(card);
-    pendingCapture = null;
-    const wasEditing = !!editingCardId;
-    editingCardId = null;
-    await loadCards();
-    showToast(wasEditing ? '已更新名片' : '已儲存名片');
-    openDetail(card.id);
+    if (!editingCardId) {
+      const dup = findDuplicate(card);
+      if (dup) { showDuplicateSheet(card, dup); return; }
+    }
+    await persistCard(card, false);
   });
+
+
+  function norm(v){return (v||'').toLowerCase().replace(/[\s()\-+.]/g,'');}
+  function findDuplicate(card){
+    let best=null,bestScore=0,reasons=[];
+    for(const c of allCards){let score=0,rs=[];if(card.email&&c.email&&norm(card.email)===norm(c.email)){score+=70;rs.push('Email 相同');}if(card.mobile&&c.mobile&&norm(card.mobile)===norm(c.mobile)){score+=65;rs.push('手機相同');}if(card.name&&c.name&&norm(card.name)===norm(c.name)){score+=25;rs.push('姓名相同');}if(card.company&&c.company&&norm(card.company)===norm(c.company)){score+=20;rs.push('公司相同');}if(score>bestScore){bestScore=score;best=c;reasons=rs;}}
+    return bestScore>=55?{card:best,score:Math.min(100,bestScore),reasons}:null;
+  }
+  function mergedValue(oldVal,newVal){return oldVal||newVal||'';}
+  function mergeCards(oldCard,newCard){
+    const merged={...oldCard};['name','nameEn','company','title','mobile','phone','phone2','fax','email','website','address','category','note'].forEach(k=>merged[k]=mergedValue(oldCard[k],newCard[k]));
+    if(!merged.phone2 && newCard.phone && norm(newCard.phone)!==norm(merged.phone))merged.phone2=newCard.phone;
+    merged.photo=newCard.photo||oldCard.photo; merged.thumb=newCard.thumb||oldCard.thumb; merged.backPhoto=newCard.backPhoto||oldCard.backPhoto; merged.backThumb=newCard.backThumb||oldCard.backThumb; merged.rawText=[oldCard.rawText,newCard.rawText].filter(Boolean).join('\n--- rescanned ---\n'); merged.updatedAt=Date.now(); return merged;
+  }
+  function showDuplicateSheet(newCard,dup){pendingDuplicate={newCard,dup};el('duplicateReason').textContent=`相似度 ${dup.score}% · ${dup.reasons.join('、')}`;el('duplicateCompare').innerHTML=`<div><strong>${escapeHtml(dup.card.name||dup.card.company||'既有名片')}</strong><span>既有</span></div><div><strong>${escapeHtml(newCard.name||newCard.company||'新掃描')}</strong><span>新掃描</span></div>`;el('duplicateSheet').classList.remove('hidden');}
+  el('btnCancelDuplicate')?.addEventListener('click',()=>{pendingDuplicate=null;el('duplicateSheet').classList.add('hidden')});
+  el('btnKeepDuplicate')?.addEventListener('click',async()=>{const x=pendingDuplicate;if(!x)return;el('duplicateSheet').classList.add('hidden');pendingDuplicate=null;await persistCard(x.newCard,false);});
+  el('btnMergeDuplicate')?.addEventListener('click',async()=>{const x=pendingDuplicate;if(!x)return;const merged=mergeCards(x.dup.card,x.newCard);el('duplicateSheet').classList.add('hidden');pendingDuplicate=null;await CardDB.put(merged);pendingCapture=null;editingCardId=null;await loadCards();showToast('已智慧合併重複名片');if(captureMode==='continuous'){batchSaved++;el('batchCount').textContent=`${batchSaved} 張`;await openCamera();}else openDetail(merged.id);});
+
+  async function persistCard(card, keepScanning){
+    const wasEditing=!!editingCardId; await CardDB.put(card); pendingCapture=null; editingCardId=null; await loadCards();
+    if(keepScanning||captureMode==='continuous'){batchSaved++;el('batchCount').textContent=`${batchSaved} 張`;showToast(`已儲存第 ${batchSaved} 張`);await openCamera();return;}
+    showToast(wasEditing?'已更新名片':'已儲存名片');openDetail(card.id);
+  }
+  el('btnSaveNext')?.addEventListener('click',()=>{el('btnSaveCard').click();});
+
+  el('btnScanBack')?.addEventListener('click',async()=>{scanningBack=true;showScreen(screenCamera);try{await CardCamera.start(video);startLiveEdges();el('guideHint').textContent='掃描名片背面';}catch(e){showToast('無法開啟相機');}});
+  el('btnRemoveBack')?.addEventListener('click',()=>{if(pendingCapture){pendingCapture.backPhoto='';pendingCapture.backThumb='';}el('backPreviewRow').classList.add('hidden');});
 
   // ===================================================
   // Detail screen
@@ -295,6 +418,7 @@
 
     el('detailTag').textContent = card.category || '未分類';
     el('detailThumb').src = card.photo || card.thumb || '';
+    el('detailThumb').dataset.side='front'; el('detailThumb').title=card.backPhoto?'點一下切換正反面':'';
     el('detailName').textContent = card.name || card.nameEn || '（未命名）';
     el('detailNameEn').textContent = card.name ? (card.nameEn || '') : '';
     el('detailNameEn').classList.toggle('hidden', !card.name || !card.nameEn);
@@ -311,7 +435,9 @@
 
     const fieldRows = [
       ['📱 手機', card.mobile],
-      ['☎️ 電話', card.phone],
+      ['☎️ 公司電話', card.phone],
+      ['☎️ 其他電話', card.phone2],
+      ['📠 傳真', card.fax],
       ['✉️ Email', card.email],
       ['🌐 網站', card.website],
       ['📍 地址', card.address],
@@ -323,6 +449,8 @@
 
     showScreen(screenDetail);
   }
+
+  el('detailThumb').addEventListener('click', async()=>{const card=await CardDB.get(currentDetailId);if(!card?.backPhoto)return;const img=el('detailThumb');const back=img.dataset.side!=='back';img.src=back?card.backPhoto:(card.photo||card.thumb||'');img.dataset.side=back?'back':'front';showToast(back?'名片背面':'名片正面');});
 
   el('btnDetailBack').addEventListener('click', closeAllScreens);
 
@@ -351,6 +479,20 @@
   el('actMap').addEventListener('click', async () => {
     const card = await CardDB.get(currentDetailId);
     if (card.address) window.location.href = `https://maps.apple.com/?q=${encodeURIComponent(card.address)}`;
+  });
+
+  el('actContact').addEventListener('click', async () => {
+    const card = await CardDB.get(currentDetailId);
+    if (!card) return;
+    try {
+      const mode = await CardVCard.addToContacts(card);
+      showToast(mode === 'shared' ? '已開啟聯絡人分享/匯入' : '已建立聯絡人 VCF 檔');
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        console.error(err);
+        showToast('無法建立聯絡人，請稍後再試');
+      }
+    }
   });
 
   el('btnEditCard').addEventListener('click', async () => {

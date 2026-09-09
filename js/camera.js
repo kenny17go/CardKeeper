@@ -1,13 +1,19 @@
 /* =========================================================
-   camera.js — getUserMedia capture + downscale to dataURL
+   camera.js — camera, guided crop, image normalization
    ========================================================= */
 const CardCamera = (() => {
   let stream = null;
 
   async function start(videoEl) {
     stop();
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera API unavailable');
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1600 } },
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        aspectRatio: { ideal: 16 / 9 }
+      },
       audio: false
     });
     videoEl.srcObject = stream;
@@ -15,35 +21,72 @@ const CardCamera = (() => {
   }
 
   function stop() {
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null;
   }
 
-  function captureFromVideo(videoEl, canvasEl, maxWidth = 1400) {
+  function canvasToJpeg(canvas, quality = 0.92) {
+    return canvas.toDataURL('image/jpeg', quality);
+  }
+
+  // Converts a crop rectangle drawn over an object-fit:cover <video>
+  // back to source video pixels, so OCR receives exactly what the user framed.
+  function captureGuide(videoEl, canvasEl, guideEl, maxWidth = 1800) {
     const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+    if (!vw || !vh) throw new Error('Camera not ready');
+
+    const vr = videoEl.getBoundingClientRect();
+    const gr = guideEl.getBoundingClientRect();
+    const coverScale = Math.max(vr.width / vw, vr.height / vh);
+    const displayedW = vw * coverScale;
+    const displayedH = vh * coverScale;
+    const cropLeft = (displayedW - vr.width) / 2;
+    const cropTop = (displayedH - vr.height) / 2;
+
+    let sx = (gr.left - vr.left + cropLeft) / coverScale;
+    let sy = (gr.top - vr.top + cropTop) / coverScale;
+    let sw = gr.width / coverScale;
+    let sh = gr.height / coverScale;
+
+    sx = Math.max(0, Math.min(vw - 1, sx));
+    sy = Math.max(0, Math.min(vh - 1, sy));
+    sw = Math.max(1, Math.min(vw - sx, sw));
+    sh = Math.max(1, Math.min(vh - sy, sh));
+
+    const scale = Math.min(1, maxWidth / sw);
+    const outW = Math.max(1, Math.round(sw * scale));
+    const outH = Math.max(1, Math.round(sh * scale));
+    canvasEl.width = outW;
+    canvasEl.height = outH;
+    canvasEl.getContext('2d', { alpha: false }).drawImage(videoEl, sx, sy, sw, sh, 0, 0, outW, outH);
+    return canvasToJpeg(canvasEl);
+  }
+
+  // Kept for compatibility / desktop fallback.
+  function captureFromVideo(videoEl, canvasEl, maxWidth = 1800) {
+    const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+    if (!vw || !vh) throw new Error('Camera not ready');
     const scale = Math.min(1, maxWidth / vw);
     const w = Math.round(vw * scale), h = Math.round(vh * scale);
-    canvasEl.width = w;
-    canvasEl.height = h;
-    const ctx = canvasEl.getContext('2d');
-    ctx.drawImage(videoEl, 0, 0, w, h);
-    return canvasEl.toDataURL('image/jpeg', 0.88);
+    canvasEl.width = w; canvasEl.height = h;
+    canvasEl.getContext('2d', { alpha: false }).drawImage(videoEl, 0, 0, w, h);
+    return canvasToJpeg(canvasEl);
   }
 
-  function fileToDataUrl(file, maxWidth = 1400) {
+  function fileToDataUrl(file, maxWidth = 2200) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
         const img = new Image();
         img.onload = () => {
-          const scale = Math.min(1, maxWidth / img.width);
-          const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+          const scale = Math.min(1, maxWidth / img.naturalWidth);
+          const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.88));
+          const ctx = canvas.getContext('2d', { alpha: false });
+          ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvasToJpeg(canvas));
         };
         img.onerror = reject;
         img.src = reader.result;
@@ -53,20 +96,21 @@ const CardCamera = (() => {
     });
   }
 
-  function makeThumbnail(dataUrl, maxWidth = 320) {
-    return new Promise((resolve) => {
+  function makeThumbnail(dataUrl, maxWidth = 420) {
+    return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
-        const scale = Math.min(1, maxWidth / img.width);
-        const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+        const scale = Math.min(1, maxWidth / img.naturalWidth);
+        const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.7));
+        canvas.getContext('2d', { alpha: false }).drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.78));
       };
+      img.onerror = reject;
       img.src = dataUrl;
     });
   }
 
-  return { start, stop, captureFromVideo, fileToDataUrl, makeThumbnail };
+  return { start, stop, captureGuide, captureFromVideo, fileToDataUrl, makeThumbnail };
 })();
