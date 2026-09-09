@@ -650,3 +650,9 @@ body{background:var(--ios-bg);}
   pointer-events:auto;
   font-size:100px;
 }
+
+/* v4.3 processing escape hatch */
+.processing-actions{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:18px;position:relative;z-index:20}
+.processing-cancel{min-width:220px;min-height:44px;touch-action:manipulation;pointer-events:auto}
+#btnSkipProcessing{min-height:40px;pointer-events:auto;touch-action:manipulation}
+#screenProcessing{overflow:auto;-webkit-overflow-scrolling:touch}
