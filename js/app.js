@@ -225,8 +225,13 @@
     const c=el('liveEdgeCanvas'),wrap=video.parentElement;if(!c||!wrap)return;
     const r=wrap.getBoundingClientRect(),dpr=Math.min(2,devicePixelRatio||1);c.width=Math.round(r.width*dpr);c.height=Math.round(r.height*dpr);c.style.width=r.width+'px';c.style.height=r.height+'px';
     const ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,r.width,r.height);if(!result?.corners)return;
-    const vw=video.videoWidth,vh=video.videoHeight,scale=Math.max(r.width/vw,r.height/vh),dw=vw*scale,dh=vh*scale,ox=(r.width-dw)/2,oy=(r.height-dh)/2;
-    const pts=result.corners.map(p=>({x:ox+p.x*dw,y:oy+p.y*dh}));ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));ctx.closePath();ctx.lineWidth=3;ctx.strokeStyle='rgba(52,199,89,.95)';ctx.stroke();
+    // result.corners are fractions of the guide box (expanded by result.guideMargin),
+    // not of the raw video frame — map onto that same box on screen so the green
+    // outline lines up with the dashed focus frame instead of drifting from it.
+    const gr=cardGuide.getBoundingClientRect(),m=result.guideMargin||0;
+    const gx=gr.left-r.left-gr.width*m, gy=gr.top-r.top-gr.height*m;
+    const gw=gr.width*(1+2*m), gh=gr.height*(1+2*m);
+    const pts=result.corners.map(p=>({x:gx+p.x*gw,y:gy+p.y*gh}));ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));ctx.closePath();ctx.lineWidth=3;ctx.strokeStyle='rgba(52,199,89,.95)';ctx.stroke();
     pts.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,6,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='rgb(52,199,89)';ctx.stroke();});
     const sharp = Number.isFinite(result.sharpness) ? ` · 清晰 ${result.sharpness}` : '';
     el('guideHint').textContent = progress > 0
@@ -263,22 +268,24 @@
       }
       liveEdgeBusy = true;
       try {
-        const r=await CardVision.detectVideoFrame(video);
+        const r=await CardVision.detectVideoFrame(video, cardGuide);
         if(r){
           const motion = cornerMotion(r.corners, lastLiveCorners);
-          const clearEnough = (r.sharpness ?? 0) >= 20;
-          const confident = r.confidence >= 46;
-          const steady = motion < 0.022;
+          const clearEnough = (r.sharpness ?? 0) >= 16;
+          const confident = r.confidence >= 40;
+          const steady = motion < 0.03;
           const xs = r.corners.map(p=>p.x), ys = r.corners.map(p=>p.y);
           const cardW = Math.max(...xs)-Math.min(...xs), cardH = Math.max(...ys)-Math.min(...ys);
-          // Prevent auto capture when the card is so close that its borders are near/outside frame.
-          const framed = Math.min(...xs) > 0.035 && Math.max(...xs) < 0.965 &&
-                         Math.min(...ys) > 0.035 && Math.max(...ys) < 0.965 &&
-                         cardW < 0.91 && cardH < 0.86;
+          // Corners are now relative to the guide box (expanded by GUIDE_MARGIN),
+          // so "framed" just means the detected quad isn't clipped at the edge
+          // of that sampled region and fills a reasonable share of it.
+          const framed = Math.min(...xs) > 0.02 && Math.max(...xs) < 0.98 &&
+                         Math.min(...ys) > 0.02 && Math.max(...ys) < 0.98 &&
+                         cardW > 0.5 && cardH > 0.42;
           const qualifies = autoCaptureEnabled && clearEnough && confident && steady && framed && Date.now() >= autoCaptureCooldownUntil;
           if (qualifies) {
             if (!stableSince) stableSince = Date.now();
-            const progress = Math.min(1, (Date.now() - stableSince) / 900);
+            const progress = Math.min(1, (Date.now() - stableSince) / 650);
             drawLiveCorners(r, progress);
             const p=el('autoCaptureProgress'); if(p)p.style.setProperty('--progress', `${Math.round(progress*360)}deg`);
             if (progress >= 1) {

@@ -174,14 +174,47 @@ const CardVision = (() => {
     return { index:best, value:bestVal };
   }
 
-  async function detectVideoFrame(videoEl) {
+  // How far past the visible guide box we sample, so a card that slightly
+  // overflows the dashed frame is still caught. Shared with app.js so the
+  // green overlay it draws lines up with exactly the region sampled here.
+  const GUIDE_MARGIN = 0.16;
+
+  async function detectVideoFrame(videoEl, guideEl) {
     if (!videoEl?.videoWidth || !videoEl?.videoHeight) return null;
+    const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+
+    // Map the ON-SCREEN guide box back into raw video-source pixels using the
+    // same object-fit:cover math as camera.js#captureGuide. Without this, the
+    // search below runs against a fixed fraction of the whole sensor frame,
+    // which has no relation to where the guide box actually sits on screen
+    // once the video is cropped/scaled by object-fit:cover — that mismatch is
+    // why the detected outline didn't line up with the visible focus frame.
+    let sx = 0, sy = 0, sw = vw, sh = vh;
+    if (guideEl) {
+      const vr = videoEl.getBoundingClientRect();
+      const gr = guideEl.getBoundingClientRect();
+      if (vr.width && vr.height && gr.width && gr.height) {
+        const coverScale = Math.max(vr.width / vw, vr.height / vh);
+        const cropLeft = (vw * coverScale - vr.width) / 2;
+        const cropTop = (vh * coverScale - vr.height) / 2;
+        const mx = gr.width * GUIDE_MARGIN, my = gr.height * GUIDE_MARGIN;
+        sx = (gr.left - mx - vr.left + cropLeft) / coverScale;
+        sy = (gr.top - my - vr.top + cropTop) / coverScale;
+        sw = (gr.width + mx * 2) / coverScale;
+        sh = (gr.height + my * 2) / coverScale;
+        sx = Math.max(0, Math.min(vw - 1, sx));
+        sy = Math.max(0, Math.min(vh - 1, sy));
+        sw = Math.max(1, Math.min(vw - sx, sw));
+        sh = Math.max(1, Math.min(vh - sy, sh));
+      }
+    }
+
     const maxW = 176;
-    const scale = Math.min(1, maxW / videoEl.videoWidth);
-    const w = Math.max(96, Math.round(videoEl.videoWidth * scale));
-    const h = Math.max(72, Math.round(videoEl.videoHeight * scale));
+    const scale = Math.min(1, maxW / sw);
+    const w = Math.max(96, Math.round(sw * scale));
+    const h = Math.max(72, Math.round(sh * scale));
     liveCanvas.width=w; liveCanvas.height=h;
-    liveCtx.drawImage(videoEl,0,0,w,h);
+    liveCtx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, w, h);
     const rgba=liveCtx.getImageData(0,0,w,h).data;
     const gray=new Uint8Array(w*h);
     let mean=0;
@@ -229,9 +262,12 @@ const CardVision = (() => {
         {x:right.index/w,y:top.index/h},
         {x:right.index/w,y:bottom.index/h},
         {x:left.index/w,y:bottom.index/h}
-      ]
+      ],
+      // Corners above are fractions of the guide-anchored sample region
+      // (guide box expanded by this margin), not of the raw video frame.
+      guideMargin: guideEl ? GUIDE_MARGIN : 0
     };
   }
 
-  return { detectAndCorrect, detectVideoFrame, getCv };
+  return { detectAndCorrect, detectVideoFrame, getCv, GUIDE_MARGIN };
 })();
