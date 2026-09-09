@@ -1,7 +1,7 @@
 {
-  "name": "名片管家 CardKeeper",
+  "name": "名片管家 CardKeeper v4",
   "short_name": "名片管家",
-  "description": "拍照 → OCR → 自動整理的名片管家，資料儲存在裝置本機。",
+  "description": "自動找邊、透視校正、OCR 智慧辨識與聯絡人匯出的名片管家。",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

@@ -26,30 +26,29 @@
 <!-- ===================== App shell ===================== -->
 <div id="app">
 
-  <!-- Top bar: drawer label -->
-  <header class="topbar">
-    <div class="brandmark" aria-hidden="true">
-      <span class="brandmark-tab"></span>
-      <span class="brandmark-dot"></span>
+  <!-- iOS-style home header -->
+  <header class="ios-home-header">
+    <div>
+      <p class="eyebrow">CARDKEEPER</p>
+      <h1>名片</h1>
     </div>
-    <div class="brand-text">
-      <h1>名片管家</h1>
-      <p>Card<span>Keeper</span></p>
+    <div class="header-actions">
+      <button id="btnBackup" class="ios-circle" title="備份 / 還原" aria-label="備份與還原">•••</button>
     </div>
-    <button id="btnBackup" class="icon-btn" title="備份 / 還原" aria-label="備份與還原">
-      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.3V4a1 1 0 0 1 1-1zM5 15a1 1 0 0 1 1 1v3h12v-3a1 1 0 1 1 2 0v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a1 1 0 0 1 1-1z"/></svg>
-    </button>
   </header>
 
-  <!-- Search + tab dividers (categories) -->
-  <div class="controlbar">
-    <div class="search">
-      <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M10 2a8 8 0 1 0 4.9 14.32l4.39 4.38a1 1 0 0 0 1.42-1.41l-4.38-4.39A8 8 0 0 0 10 2zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12z"/></svg>
-      <input id="searchInput" type="search" placeholder="搜尋姓名、公司、職稱、電話、Email…" autocomplete="off">
+  <section class="home-stats" aria-label="名片摘要">
+    <div><strong id="statTotal">0</strong><span>全部名片</span></div>
+    <div><strong id="statFav">0</strong><span>最愛</span></div>
+    <div><strong id="statRecent">0</strong><span>本週新增</span></div>
+  </section>
+
+  <div class="controlbar ios-controls">
+    <div class="search ios-search">
+      <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M10 2a8 8 0 1 0 4.9 14.32l4.39 4.38a1 1 0 0 0 1.42-1.41l-4.38-4.39A8 8 0 0 0 10 2zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12z"/></svg>
+      <input id="searchInput" type="search" placeholder="搜尋名片" autocomplete="off">
     </div>
-    <div id="tagTabs" class="tag-tabs" role="tablist" aria-label="分類">
-      <!-- populated by JS: 全部 / 最愛 / dynamic category tabs -->
-    </div>
+    <div id="tagTabs" class="tag-tabs ios-tabs" role="tablist" aria-label="分類"></div>
   </div>
 
   <!-- Card catalog -->
@@ -74,13 +73,15 @@
 <section id="screenCamera" class="screen hidden" aria-label="拍攝名片">
   <div class="camera-wrap">
     <video id="video" playsinline autoplay muted></video>
+    <canvas id="liveEdgeCanvas" class="live-edge-canvas" aria-hidden="true"></canvas>
     <canvas id="captureCanvas" class="hidden"></canvas>
-    <div class="card-guide" aria-hidden="true">
+    <div id="cardGuide" class="card-guide" aria-hidden="true">
       <span class="corner tl"></span><span class="corner tr"></span>
       <span class="corner bl"></span><span class="corner br"></span>
-      <p>將名片對齊框線</p>
+      <p id="guideHint">正在尋找名片邊界…</p>
     </div>
   </div>
+  <div class="capture-mode-bar"><button id="btnModeSingle" class="capture-mode active">單張</button><button id="btnModeContinuous" class="capture-mode">連續掃描</button><span id="batchCount" class="batch-count hidden">0 張</span></div>
   <div class="camera-actions">
     <button id="btnCloseCamera" class="btn-ghost-round">取消</button>
     <button id="btnShoot" class="shutter" aria-label="拍照"></button>
@@ -97,7 +98,8 @@
     <div class="scan-line"></div>
   </div>
   <p id="processingLabel">正在讀取名片文字…</p>
-  <p id="processingSub" class="sub">OCR 中英文辨識</p>
+  <p id="processingSub" class="sub">智慧找邊 · 透視校正 · OCR v2</p>
+  <div id="processingSteps" class="processing-steps" aria-live="polite"><span>找邊</span><span>拉正</span><span>OCR</span><span>解析</span></div>
 </section>
 
 <!-- ===================== Confirm / Edit Screen ===================== -->
@@ -107,14 +109,15 @@
       <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M15.7 4.3a1 1 0 0 1 0 1.4L9.42 12l6.3 6.3a1 1 0 1 1-1.42 1.4l-7-7a1 1 0 0 1 0-1.4l7-7a1 1 0 0 1 1.42 0z"/></svg>
     </button>
     <h2>確認名片資料</h2>
-    <button id="btnSaveCard" class="btn-brass">儲存</button>
+    <div class="save-actions"><button id="btnSaveNext" class="btn-save-next hidden">儲存並繼續</button><button id="btnSaveCard" class="btn-brass">儲存</button></div>
   </header>
 
   <div class="confirm-body">
     <div class="confirm-photo-row">
       <img id="confirmThumb" alt="名片照片">
-      <p class="hint">已自動判讀，請確認欄位無誤</p>
+      <div><p class="hint">已自動判讀，請確認欄位無誤</p><p id="ocrQuality" class="ocr-quality">辨識品質：—</p><button id="btnScanBack" type="button" class="mini-link">＋ 掃描名片背面</button></div>
     </div>
+    <div id="backPreviewRow" class="back-preview-row hidden"><img id="confirmBackThumb" alt="名片背面"><div><strong>名片背面</strong><p>已加入這張名片</p><button id="btnRemoveBack" type="button" class="mini-link danger-text">移除</button></div></div>
 
     <form id="cardForm" class="card-form">
       <label class="field">
@@ -138,8 +141,16 @@
         <input name="mobile" type="tel" placeholder="0912-345-678">
       </label>
       <label class="field">
-        <span>☎️ 電話</span>
-        <input name="phone" type="tel" placeholder="02-1234-5678">
+        <span>☎️ 公司電話</span>
+        <input name="phone" type="tel" placeholder="02-1234-5678 分機 123">
+      </label>
+      <label class="field">
+        <span>☎️ 其他電話</span>
+        <input name="phone2" type="tel" placeholder="03-1234-5678">
+      </label>
+      <label class="field">
+        <span>📠 傳真</span>
+        <input name="fax" type="tel" placeholder="02-1234-5679">
       </label>
       <label class="field">
         <span>✉️ Email</span>
@@ -202,6 +213,7 @@
       <button id="actMobile" class="action-pill"><span>📱</span>傳簡訊</button>
       <button id="actEmail" class="action-pill"><span>✉️</span>寄 Email</button>
       <button id="actMap" class="action-pill"><span>🗺️</span>Apple Maps</button>
+      <button id="actContact" class="action-pill contact-action"><span>👤＋</span>加入聯絡人</button>
     </div>
 
     <dl class="detail-fields" id="detailFields"></dl>
@@ -237,13 +249,29 @@
   </div>
 </section>
 
+
+<section id="duplicateSheet" class="duplicate-sheet hidden" aria-label="重複名片提醒">
+  <div class="duplicate-panel">
+    <div class="grabber"></div>
+    <h3>可能已經有這張名片</h3>
+    <p id="duplicateReason" class="duplicate-reason"></p>
+    <div id="duplicateCompare" class="duplicate-compare"></div>
+    <button id="btnMergeDuplicate" class="btn-brass full">智慧合併到既有名片</button>
+    <button id="btnKeepDuplicate" class="btn-outline full">仍然建立新名片</button>
+    <button id="btnCancelDuplicate" class="sheet-cancel">取消</button>
+  </div>
+</section>
+
 <!-- Toast -->
 <div id="toast" class="toast hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script async src="https://docs.opencv.org/4.13.0/opencv.js"></script>
 <script src="js/db.js"></script>
 <script src="js/parse.js"></script>
+<script src="js/vision.js"></script>
 <script src="js/ocr.js"></script>
+<script src="js/vcard.js"></script>
 <script src="js/camera.js"></script>
 <script src="js/app.js"></script>
 </body>
