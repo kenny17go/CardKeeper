@@ -1,3 +1,14 @@
+# CardKeeper Smart Scan v4.2 — iPhone Camera Hotfix
+
+## v4.2 這次修正
+- 即時找邊不再使用 OpenCV/WASM 主執行緒運算；改為低解析度輕量影格分析，避免 iPhone Safari 控制列卡死。
+- 「取消／手動快門／相簿」控制列提高獨立圖層與觸控優先權。
+- 相簿改為原生 file input 直接覆蓋按鈕，不以 JavaScript 模擬點擊。
+- 相機移除強制 16:9，並在瀏覽器支援時將 zoom 設為接近 1×、focusMode 設為 continuous，降低近拍時鏡頭突然拉太近。
+- 自動拍攝仍需約 0.9 秒穩定；新增「四邊必須完整留在畫面內」條件，太靠近不會自動拍。
+- 拍照後仍使用高解析 OpenCV 做名片四角偵測與透視校正。
+- Service Worker 更新為 v4.2，並改成 network-first，降低 iPhone 持續吃到舊版快取的機率。
+
 
 ## v4.1 Debug / Auto Capture
 

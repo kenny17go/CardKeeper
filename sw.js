@@ -2,7 +2,7 @@
    sw.js — app-shell cache so CardKeeper works offline
    (all card DATA lives in IndexedDB, not in this cache)
    ========================================================= */
-const CACHE_NAME = 'cardkeeper-shell-v4.1';
+const CACHE_NAME = 'cardkeeper-shell-v4.2';
 const SHELL_FILES = [
   './',
   './index.html',
@@ -39,23 +39,16 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
-
   const url = new URL(req.url);
-
-  // Never try to cache/intercept cross-origin CDN calls (e.g. Tesseract, fonts) —
-  // let the browser handle those directly so OCR keeps working normally.
   if (url.origin !== self.location.origin) return;
 
+  // Network-first prevents an older installed iPhone PWA from being trapped
+  // on a buggy cached shell after a GitHub Pages deployment.
   event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-          return res;
-        })
-        .catch(() => cached);
-    })
+    fetch(req).then((res) => {
+      const copy = res.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+      return res;
+    }).catch(() => caches.match(req).then((cached) => cached || caches.match('./index.html')))
   );
 });
