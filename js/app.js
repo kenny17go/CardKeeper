@@ -258,6 +258,18 @@
     captureInProgress = false;
   }
 
+  // The live search area is the guide box expanded by GUIDE_MARGIN (see
+  // vision.js), but the actual photo crop (camera.js#captureGuide) only ever
+  // keeps the guide box itself — no expansion. So "framed" must be judged
+  // against where the guide box sits *within* that expanded search area, not
+  // against the full search area. Getting this wrong is what let auto-capture
+  // fire while the card was still overflowing past the box edge, silently
+  // clipped off by the crop afterwards.
+  const GM = CardVision.GUIDE_MARGIN ?? 0.16;
+  const BOX_LO = GM / (1 + 2 * GM);      // guide box's left/top edge, as a fraction of the sampled (expanded) region
+  const BOX_HI = 1 - BOX_LO;             // guide box's right/bottom edge
+  const BOX_SPAN = BOX_HI - BOX_LO;      // guide box's width/height, same units
+
   function startLiveEdges(){
     stopLiveEdges();
     const loop = async () => {
@@ -276,12 +288,12 @@
           const steady = motion < 0.03;
           const xs = r.corners.map(p=>p.x), ys = r.corners.map(p=>p.y);
           const cardW = Math.max(...xs)-Math.min(...xs), cardH = Math.max(...ys)-Math.min(...ys);
-          // Corners are now relative to the guide box (expanded by GUIDE_MARGIN),
-          // so "framed" just means the detected quad isn't clipped at the edge
-          // of that sampled region and fills a reasonable share of it.
-          const framed = Math.min(...xs) > 0.02 && Math.max(...xs) < 0.98 &&
-                         Math.min(...ys) > 0.02 && Math.max(...ys) < 0.98 &&
-                         cardW > 0.5 && cardH > 0.42;
+          // Small inward slack (not outward!) so noise in the 176px-wide sample
+          // can't push a genuinely-outside-the-box card over the line.
+          const slack = 0.02;
+          const framed = Math.min(...xs) > BOX_LO + slack && Math.max(...xs) < BOX_HI - slack &&
+                         Math.min(...ys) > BOX_LO + slack && Math.max(...ys) < BOX_HI - slack &&
+                         cardW > BOX_SPAN * 0.74 && cardH > BOX_SPAN * 0.68;
           const qualifies = autoCaptureEnabled && clearEnough && confident && steady && framed && Date.now() >= autoCaptureCooldownUntil;
           if (qualifies) {
             if (!stableSince) stableSince = Date.now();
