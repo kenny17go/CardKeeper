@@ -202,6 +202,38 @@
     return [...groups.entries()].sort((a,b) => b[1].length - a[1].length || a[0].localeCompare(b[0], 'zh-Hant'));
   }
 
+  function editResult(index) {
+    const r = results[index];
+    if (!r) return;
+    const fields = [
+      ['name','姓名'],['nameEn','英文姓名'],['company','公司'],['taxId','公司統編'],
+      ['department','部門'],['title','職稱'],['mobile','手機'],['phone','公司電話'],
+      ['phone2','第二電話'],['extension','分機'],['fax','傳真'],['email','Email'],
+      ['website','網址'],['address','地址'],['postalCode','郵遞區號'],['country','國家/地區'],
+      ['category','分類'],['note','備註']
+    ];
+    const overlay = document.createElement('div');
+    overlay.className = 'ai-edit-overlay';
+    overlay.innerHTML = `<div class="ai-edit-sheet">
+      <div class="ai-edit-head"><strong>確認名片資料</strong><button type="button" class="ai-edit-close">×</button></div>
+      <div class="ai-edit-fields">${fields.map(([key,label]) => `
+        <label><span>${label}${confidenceBadge(r,key,r[key])}</span>
+        ${key === 'note' ? `<textarea data-key="${key}" rows="3">${esc(r[key])}</textarea>` : `<input data-key="${key}" value="${esc(r[key])}">`}</label>`).join('')}
+      </div>
+      <button type="button" class="ai-edit-save">完成確認</button>
+    </div>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('.ai-edit-close').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    overlay.querySelector('.ai-edit-save').addEventListener('click', () => {
+      overlay.querySelectorAll('[data-key]').forEach(input => r[input.dataset.key] = input.value.trim());
+      r.reviewed = true;
+      close();
+      renderResults();
+    });
+  }
+
   function renderResults() {
     const box = $('aiBatchResults');
     box.classList.toggle('hidden', results.length === 0);
@@ -222,6 +254,7 @@
                 <strong>${esc(r.name || r.nameEn || r.company || '待確認名片')}</strong>
                 <span>${esc([r.title, r.company].filter(Boolean).join(' · ') || '尚未辨識完整')}</span>
                 <span>${r.confidence ? 'AI 信心 ' + Math.round(r.confidence) + '%' : 'AI 信心未提供'}</span>
+                <button type="button" class="ai-result-edit">${r.reviewed ? '✓ 已確認' : '檢查 / 修改'}</button>
               </div>
             </div>
             <div class="ai-result-grid">
@@ -245,6 +278,7 @@
       card.querySelector('.ai-result-select').addEventListener('change', e => {
         results[i].selected = e.target.checked;
       });
+      card.querySelector('.ai-result-edit')?.addEventListener('click', () => editResult(i));
     });
   }
 
