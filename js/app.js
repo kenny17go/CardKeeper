@@ -510,8 +510,8 @@
             const done = () => { clearTimeout(timer); resolve(); };
             const timer = setTimeout(() => {
               window.removeEventListener('cardpaddle-ready', done);
-              reject(new Error('PaddleOCR module unavailable'));
-            }, 8000);
+              reject(new Error('PaddleOCR module unavailable: ' + (window.__paddleLoadError?.message || 'timeout')));
+            }, 20000);
             window.addEventListener('cardpaddle-ready', done, { once: true });
           });
         }
