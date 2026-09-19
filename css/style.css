@@ -692,7 +692,7 @@ body{background:var(--ios-bg);}
 .ai-result-main strong{display:block;font-size:16px}
 .ai-result-main span{display:block;color:#6B7482;font-size:12px;margin-top:2px}
 .ai-result-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;font-size:12px;color:#4A5260}
-.ai-result-grid div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ai-result-grid div{overflow:hidden;text-overflow:ellipsis;white-space:normal;overflow-wrap:anywhere}
 .ai-batch-test-tools summary{font-weight:700;cursor:pointer}
 .ai-batch-status{font-size:13px;color:var(--ink-soft);margin:10px 0}
 @media(max-width:380px){.ai-batch-actions{grid-template-columns:1fr}}
