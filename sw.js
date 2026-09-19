@@ -1,8 +1,8 @@
 /* CardKeeper v5 Stable service worker */
-const CACHE_NAME = 'cardkeeper-shell-paddle-5.1.2';
+const CACHE_NAME = 'cardkeeper-shell-paddle-5.1.3';
 const SHELL_FILES = [
   './','./index.html','./css/style.css','./js/db.js','./js/parse.js',
-  './js/vision.js','./js/ocr.js','./paddle-integration/dist/paddle-ocr.js','./js/vcard.js','./js/camera.js','./js/app.js',
+  './js/vision.js','./js/ocr.js','./paddle-integration/dist/paddle-entry-513.js','./js/vcard.js','./js/camera.js','./js/app.js',
   './manifest.json','./icons/icon-192.png','./icons/icon-512.png','./icons/apple-touch-icon.png'
 ];
 self.addEventListener('install', event => {
