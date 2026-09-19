@@ -79,11 +79,9 @@ jobs:
           rm -rf /tmp/cardkeeper-paddle
           mkdir -p /tmp/cardkeeper-paddle
           cp index.html manifest.json sw.js /tmp/cardkeeper-paddle/
-          cp -R css js icons paddle-integration /tmp/cardkeeper-paddle/
-          # Reuse the exact PaddleOCR bundle that already works on iPhone.
-          # This avoids integration-build differences in worker/model asset URLs.
-          git fetch origin paddleocr-test
-          git show origin/paddleocr-test:paddle-built/assets/index-ChteX_-J.js > /tmp/cardkeeper-paddle/paddle-integration/dist/paddle-ocr.js
+          cp -R css js icons /tmp/cardkeeper-paddle/
+          mkdir -p /tmp/cardkeeper-paddle/paddle-integration
+          cp -R paddle-integration/dist /tmp/cardkeeper-paddle/paddle-integration/
       - name: Publish preview folder to paddleocr-test
         if: github.event_name == 'push'
         run: |
