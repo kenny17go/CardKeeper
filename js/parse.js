@@ -160,7 +160,7 @@ const CardParse = (() => {
       return /^(?:地址|address)\s*[:：]?/i.test(l) ? hits>=1 : hits>=2;
     })||'';
     if(addrRaw)used.add(addrRaw);
-    const addr=addrRaw.replace(/^(地址|address)\s*[:：]?\s*/i,'').replace(/\s*(?:統編|統一編號)\s*[:：]?\s*\d{8}.*$/i,'').replace(/[ _-]+$/,'').trim();
+    const addr=addrRaw.replace(/^(地址|address)\s*[:：]?\s*/i,'').replace(/^[=：:·•\-\s]+/,'').replace(/\s*(?:統編|統一編號)\s*[:：]?\s*\d{8}.*$/i,'').replace(/[ _-]+$/,'').trim();
 
     let name='';
     let nameEn='';
