@@ -728,3 +728,10 @@ body{background:var(--ios-bg);}
 .ai-edit-fields label:has(textarea){grid-column:1/-1}
 .ai-edit-save{width:100%;margin-top:14px;border:0;border-radius:12px;padding:13px;background:#3478f6;color:#fff;font-size:15px;font-weight:800}
 @media(max-width:420px){.ai-edit-fields{grid-template-columns:1fr}}
+
+.ai-batch-filters{display:flex;gap:7px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.ai-batch-filters::-webkit-scrollbar{display:none}
+.ai-batch-filters button{flex:none;border:1px solid #d7dce4;background:#fff;color:#5b6472;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:700}
+.ai-batch-filters button.active{background:#3478f6;color:#fff;border-color:#3478f6}
+.ai-batch-filters button span{margin-left:4px;opacity:.72}
+.ai-filter-empty{text-align:center;color:#7b8490;padding:26px 8px;font-size:13px}
