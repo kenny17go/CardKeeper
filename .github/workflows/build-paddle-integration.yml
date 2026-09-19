@@ -1,6 +1,8 @@
 name: Build PaddleOCR integration
 
 on:
+  pull_request:
+    branches: [paddle-integration-test]
   push:
     branches: [paddle-integration-test]
     paths:
