@@ -8,6 +8,8 @@
   let allCards = [];
   let activeTab = 'all';       // 'all' | 'fav' | category name
   let searchQuery = '';
+  let batchSelectMode = false;
+  const batchSelectedIds = new Set();
   let pendingCapture = null;   // { imageDataUrl, thumbDataUrl, rawText, parsed }
   let editingCardId = null;
   let captureMode = 'single';
@@ -112,10 +114,15 @@
     renderList();
   }
 
+  function cardCategories(card) {
+    const tags = Array.isArray(card.tags) ? card.tags.filter(Boolean) : [];
+    return [...new Set([card.category || '未分類', ...tags])];
+  }
+
   function getCategories() {
     const set = new Set();
-    allCards.forEach(c => set.add(c.category || '未分類'));
-    return [...set].sort();
+    allCards.forEach(c => cardCategories(c).forEach(cat => set.add(cat)));
+    return [...set].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
   }
 
   function renderTabs() {
@@ -124,7 +131,7 @@
     const tabs = [
       { key: 'all', label: '全部', count: allCards.length },
       { key: 'fav', label: '⭐ 最愛', count: favCount },
-      ...cats.map(c => ({ key: c, label: c, count: allCards.filter(x => (x.category || '未分類') === c).length }))
+      ...cats.map(c => ({ key: c, label: c, count: allCards.filter(x => cardCategories(x).includes(c)).length }))
     ];
     tagTabs.innerHTML = tabs.map(t => `
       <button class="tag-tab ${activeTab === t.key ? 'active' : ''}" data-tab="${escapeHtml(t.key)}">
@@ -143,18 +150,29 @@
   function filteredCards() {
     let list = allCards;
     if (activeTab === 'fav') list = list.filter(c => c.favorite);
-    else if (activeTab !== 'all') list = list.filter(c => (c.category || '未分類') === activeTab);
+    else if (activeTab !== 'all') list = list.filter(c => cardCategories(c).includes(activeTab));
 
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      list = list.filter(c => [c.name, c.nameEn, c.company, c.title, c.mobile, c.phone, c.phone2, c.fax, c.email, c.address, c.category]
+      list = list.filter(c => [c.name, c.nameEn, c.company, c.title, c.department, c.taxId, c.mobile, c.phone, c.phone2, c.extension, c.fax, c.email, c.website, c.address, c.companyAddress, c.postalCode, c.country, c.category, ...(Array.isArray(c.tags)?c.tags:[]), c.note]
         .filter(Boolean).some(v => v.toLowerCase().includes(q)));
     }
     return list;
   }
 
+  function updateBatchTagBar(list = filteredCards()) {
+    const bar = el('batchTagBar'); if (!bar) return;
+    const hasSearch = !!searchQuery.trim();
+    bar.classList.toggle('hidden', !hasSearch);
+    if (!hasSearch) { batchSelectMode=false; batchSelectedIds.clear(); return; }
+    el('batchTagSummary').textContent = batchSelectMode ? `${batchSelectedIds.size} / ${list.length} 張已選` : `${list.length} 張符合「${searchQuery.trim()}」`;
+    el('btnBatchSelect')?.classList.toggle('hidden', batchSelectMode);
+    ['btnBatchSelectAll','btnBatchTag','btnBatchCancel'].forEach(id=>el(id)?.classList.toggle('hidden', !batchSelectMode));
+  }
+
   function renderList() {
     const list = filteredCards();
+    updateBatchTagBar(list);
     emptyState.classList.toggle('hidden', allCards.length !== 0);
     if (allCards.length === 0) { cardList.innerHTML = ''; return; }
 
@@ -164,7 +182,8 @@
     }
 
     cardList.innerHTML = list.map(c => `
-      <article class="card-item" data-id="${escapeHtml(c.id)}">
+      <article class="card-item ${batchSelectMode ? 'batch-selectable' : ''} ${batchSelectedIds.has(c.id)?'batch-selected':''}" data-id="${escapeHtml(c.id)}">
+        ${batchSelectMode ? `<span class="batch-check">${batchSelectedIds.has(c.id)?'✓':''}</span>` : ''}
         <div class="tab">${escapeHtml(c.category || '未分類')}</div>
         ${c.favorite ? '<div class="fav-star">⭐</div>' : ''}
         <div class="card-row">
@@ -184,13 +203,51 @@
     `).join('');
 
     cardList.querySelectorAll('.card-item').forEach(node => {
-      node.addEventListener('click', () => openDetail(node.dataset.id));
+      node.addEventListener('click', () => {
+        if (batchSelectMode) {
+          const id=node.dataset.id;
+          batchSelectedIds.has(id) ? batchSelectedIds.delete(id) : batchSelectedIds.add(id);
+          renderList();
+        } else openDetail(node.dataset.id);
+      });
     });
   }
 
   searchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value;
+    batchSelectMode = false; batchSelectedIds.clear();
     renderList();
+  });
+
+  el('btnBatchSelect')?.addEventListener('click',()=>{ batchSelectMode=true; batchSelectedIds.clear(); renderList(); });
+  el('btnBatchCancel')?.addEventListener('click',()=>{ batchSelectMode=false; batchSelectedIds.clear(); renderList(); });
+  el('btnBatchSelectAll')?.addEventListener('click',()=>{
+    const list=filteredCards();
+    const all=list.length && list.every(c=>batchSelectedIds.has(c.id));
+    if(all) list.forEach(c=>batchSelectedIds.delete(c.id)); else list.forEach(c=>batchSelectedIds.add(c.id));
+    renderList();
+  });
+  el('btnBatchTag')?.addEventListener('click', async()=>{
+    if(!batchSelectedIds.size){ showToast('請先選取名片'); return; }
+    const existing=getCategories().filter(c=>c!=='未分類').join('、');
+    const tag=prompt('輸入要加入的分類名稱' + (existing ? '\n目前分類：'+existing : ''), '');
+    if(tag===null) return;
+    const clean=tag.trim();
+    if(!clean){ showToast('分類名稱不能空白'); return; }
+    try{
+      for(const id of batchSelectedIds){
+        const card=await CardDB.get(id); if(!card) continue;
+        const tags=Array.isArray(card.tags)?card.tags.filter(Boolean):[];
+        if(!tags.includes(clean) && card.category!==clean) tags.push(clean);
+        card.tags=[...new Set(tags)];
+        card.updatedAt=Date.now();
+        await CardDB.put(card);
+      }
+      const n=batchSelectedIds.size;
+      batchSelectMode=false; batchSelectedIds.clear();
+      await loadCards();
+      showToast(`已將 ${n} 張名片加入「${clean}」`);
+    }catch(err){ console.error(err); showToast('批次分類失敗，請稍後再試'); }
   });
 
   // ===================================================
