@@ -1,5 +1,5 @@
 /* CardKeeper v5.1 OCR service worker */
-const CACHE_NAME = 'cardkeeper-shell-v5.1.1';
+const CACHE_NAME = 'cardkeeper-shell-v5.1.2';
 const SHELL_FILES = [
   './','./index.html','./css/style.css','./js/db.js','./js/parse.js',
   './js/vision.js','./js/ocr.js','./js/vcard.js','./js/camera.js','./js/app.js',
