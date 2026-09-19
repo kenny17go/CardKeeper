@@ -10,6 +10,7 @@
 
   let photos = [];
   let results = [];
+  let batchSource = '';
 
   const uid = () => 'c_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
   const esc = s => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -93,6 +94,7 @@
   }
 
   function normalizeResult(item, index) {
+    const fieldConfidence = item.fieldConfidence || {};
     return {
       id: item.id || ('ai_' + index + '_' + Date.now().toString(36)),
       selected: item.selected !== false,
@@ -112,8 +114,20 @@
       address: item.address || '',
       category: item.category || '未分類',
       note: item.note || '',
-      rawText: item.rawText || ''
+      rawText: item.rawText || '',
+      fieldConfidence,
+      duplicateStatus: item.duplicateStatus || '',
+      previousId: item.previousId || ''
     };
+  }
+
+  function confidenceBadge(r, key, value) {
+    if (!value) return '';
+    const score = Number(r.fieldConfidence?.[key]);
+    if (!Number.isFinite(score)) return '';
+    if (score >= 85) return '<span class="ai-field-ok">✓</span>';
+    if (score >= 65) return '<span class="ai-field-mid">請確認</span>';
+    return '<span class="ai-field-low">低信心</span>';
   }
 
   function renderResults() {
@@ -134,9 +148,12 @@
           </div>
         </div>
         <div class="ai-result-grid">
-          <div>📱 ${esc(r.mobile || '—')}</div><div>☎️ ${esc(r.phone || '—')}</div>
-          <div>✉️ ${esc(r.email || '—')}</div><div>🏷️ ${esc(r.category || '未分類')}</div>
+          <div>📱 ${esc(r.mobile || '—')} ${confidenceBadge(r,'mobile',r.mobile)}</div>
+          <div>☎️ ${esc(r.phone || '—')} ${confidenceBadge(r,'phone',r.phone)}</div>
+          <div>✉️ ${esc(r.email || '—')} ${confidenceBadge(r,'email',r.email)}</div>
+          <div>🏷️ ${esc(r.category || '未分類')}</div>
         </div>
+        ${r.duplicateStatus ? `<div class="ai-duplicate-note">${esc(r.duplicateStatus)}</div>` : ''}
       </article>`;
     }).join('');
 
@@ -173,7 +190,7 @@
           name:r.name, nameEn:r.nameEn, company:r.company, title:r.title,
           mobile:r.mobile, phone:r.phone, phone2:r.phone2, fax:r.fax,
           email:r.email, website:r.website, address:r.address,
-          category:r.category || '未分類', note:r.note || '',
+          category:r.category || '未分類', note:[batchSource ? '來源：' + batchSource : '', r.note || ''].filter(Boolean).join(' · '),
           favorite:false, rawText:r.rawText || '', photo, thumb,
           backPhoto:'', backThumb:'', createdAt:now, updatedAt:now,
           aiBatch:true, aiConfidence:r.confidence || 0
@@ -192,6 +209,12 @@
   }
 
   $('btnAiBatch')?.addEventListener('click', open);
+  const sourceInput = document.createElement('input');
+  sourceInput.id = 'aiBatchSource';
+  sourceInput.className = 'ai-batch-source';
+  sourceInput.placeholder = '這批名片來源，例如：2026 金融論壇';
+  sourceInput.addEventListener('input', e => batchSource = e.target.value.trim());
+  document.querySelector('.ai-batch-intro')?.insertAdjacentElement('afterend', sourceInput);
   $('btnAiBatchBack')?.addEventListener('click', () => { close(); location.reload(); });
   $('aiBatchCameraInput')?.addEventListener('change', async e => {
     await addFiles(e.target.files); e.target.value = '';
