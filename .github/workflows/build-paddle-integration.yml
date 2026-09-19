@@ -7,6 +7,11 @@ on:
     branches: [paddle-integration-test]
     paths:
       - 'paddle-integration/**'
+      - 'index.html'
+      - 'css/**'
+      - 'js/**'
+      - 'manifest.json'
+      - 'sw.js'
       - '.github/workflows/build-paddle-integration.yml'
   workflow_dispatch:
 
@@ -37,4 +42,26 @@ jobs:
           else
             git commit -m "Build PaddleOCR integration bundle"
             git push
+          fi
+
+      - name: Prepare isolated Pages preview
+        if: github.event_name == 'push'
+        run: |
+          rm -rf /tmp/cardkeeper-paddle
+          mkdir -p /tmp/cardkeeper-paddle
+          cp index.html manifest.json sw.js /tmp/cardkeeper-paddle/
+          cp -R css js icons paddle-integration /tmp/cardkeeper-paddle/
+      - name: Publish preview folder to paddleocr-test
+        if: github.event_name == 'push'
+        run: |
+          git fetch origin paddleocr-test
+          git checkout paddleocr-test
+          rm -rf cardkeeper-paddle
+          cp -R /tmp/cardkeeper-paddle ./cardkeeper-paddle
+          git add cardkeeper-paddle
+          if git diff --cached --quiet; then
+            echo "No preview changes"
+          else
+            git commit -m "Deploy CardKeeper PaddleOCR integration preview"
+            git push origin paddleocr-test
           fi
