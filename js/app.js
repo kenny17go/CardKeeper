@@ -652,7 +652,7 @@
 
   async function persistCard(card, keepScanning){
     const wasEditing=!!editingCardId;
-    const storedCard = await prepareCardForStorage(card);
+    const storedCard = pendingCapture ? await prepareCardForStorage(card) : card;
     await CardDB.put(storedCard); pendingCapture=null; editingCardId=null; await loadCards();
     if(keepScanning||captureMode==='continuous'){batchSaved++;el('batchCount').textContent=`${batchSaved} 張`;showToast(`已儲存第 ${batchSaved} 張`);await openCamera();return;}
     showToast(wasEditing?'已更新名片':'已儲存名片');openDetail(storedCard.id);
