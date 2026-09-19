@@ -41,8 +41,29 @@ const CardCamera = (() => {
     stream = null;
   }
 
-  function canvasToJpeg(canvas, quality = 0.92) {
+  function canvasToJpeg(canvas, quality = 0.86) {
     return canvas.toDataURL('image/jpeg', quality);
+  }
+
+  // Normalize stored photos so IndexedDB does not fill up with multi-megabyte
+  // camera frames. OCR still receives enough pixels for business-card text.
+  function normalizeForStorage(dataUrl, maxWidth = 1600, quality = 0.84) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.naturalWidth);
+        const w = Math.max(1, Math.round(img.naturalWidth * scale));
+        const h = Math.max(1, Math.round(img.naturalHeight * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d', { alpha:false });
+        ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
+        ctx.drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
   }
 
   // Converts a crop rectangle drawn over an object-fit:cover <video>
@@ -128,5 +149,5 @@ const CardCamera = (() => {
     });
   }
 
-  return { start, stop, captureGuide, captureFromVideo, fileToDataUrl, makeThumbnail };
+  return { start, stop, captureGuide, captureFromVideo, fileToDataUrl, makeThumbnail, normalizeForStorage };
 })();
