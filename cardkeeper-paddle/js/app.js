@@ -523,8 +523,11 @@
         showToast('PaddleOCR：' + paddleMsg);
         try { CardPaddleOCR?.reset?.().catch(() => {}); } catch (_) {}
         assertProcessing(runId);
-        el('processingLabel').textContent = 'PaddleOCR 未完成，改用備援辨識…';
-        el('processingSub').textContent = 'Paddle錯誤：' + paddleMsg;
+        el('processingLabel').textContent = 'PaddleOCR 錯誤';
+        el('processingSub').textContent = paddleMsg;
+        // Test build: stop here so the real Paddle error remains visible.
+        // Do not immediately overwrite it with Tesseract progress.
+        return;
         try {
           ocrResult = await withTimeout(CardOCR.recognize(workingImage, (m) => {
             if (runId !== processingRunId) return;
