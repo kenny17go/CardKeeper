@@ -559,7 +559,7 @@
 
   function openConfirmScreen(parsed, imageDataUrl, rawText, confidence = null, visionMeta = null) {
     cardForm.reset();
-    for (const key of ['name','nameEn','company','title','mobile','phone','phone2','fax','email','website','address','category','note']) {
+    for (const key of ['name','nameEn','company','title','department','taxId','mobile','phone','phone2','extension','fax','email','website','address','companyAddress','postalCode','country','category','note']) {
       if (cardForm.elements[key]) cardForm.elements[key].value = parsed[key] || '';
     }
     cardForm.elements.favorite.checked = !!parsed.favorite;
@@ -602,13 +602,19 @@
       nameEn: (fd.get('nameEn') || '').trim(),
       company: (fd.get('company') || '').trim(),
       title: (fd.get('title') || '').trim(),
+      department: (fd.get('department') || '').trim(),
+      taxId: (fd.get('taxId') || '').trim(),
       mobile: (fd.get('mobile') || '').trim(),
       phone: (fd.get('phone') || '').trim(),
       phone2: (fd.get('phone2') || '').trim(),
+      extension: (fd.get('extension') || '').trim(),
       fax: (fd.get('fax') || '').trim(),
       email: (fd.get('email') || '').trim(),
       website: (fd.get('website') || '').trim(),
       address: (fd.get('address') || '').trim(),
+      companyAddress: (fd.get('companyAddress') || '').trim(),
+      postalCode: (fd.get('postalCode') || '').trim(),
+      country: (fd.get('country') || '').trim(),
       category: (fd.get('category') || '').trim() || '未分類',
       note: (fd.get('note') || '').trim(),
       favorite: fd.get('favorite') === 'on',
@@ -725,13 +731,19 @@
     el('actMap').disabled = !card.address;
 
     const fieldRows = [
+      ['🏬 部門', card.department],
+      ['🧾 公司統編', card.taxId],
       ['📱 手機', card.mobile],
       ['☎️ 公司電話', card.phone],
       ['☎️ 其他電話', card.phone2],
+      ['🔢 分機', card.extension],
       ['📠 傳真', card.fax],
       ['✉️ Email', card.email],
       ['🌐 網站', card.website],
       ['📍 地址', card.address],
+      ['🏢 公司地址', card.companyAddress],
+      ['📮 郵遞區號', card.postalCode],
+      ['🌏 國家 / 地區', card.country],
       ['📝 備註', card.note]
     ].filter(([, v]) => v);
     el('detailFields').innerHTML = fieldRows.map(([k, v]) => `
