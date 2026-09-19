@@ -21,8 +21,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: paddle-src/package-lock.json
       - name: Install
         working-directory: paddle-src
         run: npm install
