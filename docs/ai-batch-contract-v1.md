@@ -65,6 +65,9 @@ Purpose: define a provider-neutral request/response format for AI batch business
         "email": "ming@example.com",
         "website": "www.example.com",
         "address": "台北市...",
+        "department": "企業金融部",
+        "extension": "1688",
+        "taxId": "12345678",
         "category": "金融",
         "note": ""
       },
