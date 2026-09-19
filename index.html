@@ -31,7 +31,7 @@
     <div>
       <div class="home-title-meta">
         <p class="eyebrow">CARDKEEPER</p>
-        <span class="app-version">Import Test · 5.3.1</span>
+        <span class="app-version">Import Test · 5.3.2</span>
       </div>
       <h1>名片</h1>
     </div>
@@ -52,6 +52,13 @@
       <input id="searchInput" type="search" placeholder="搜尋名片" autocomplete="off">
     </div>
     <div id="tagTabs" class="tag-tabs ios-tabs" role="tablist" aria-label="分類"></div>
+    <div id="batchTagBar" class="batch-tag-bar hidden">
+      <span id="batchTagSummary">0 張符合</span>
+      <button id="btnBatchSelect" type="button">選取</button>
+      <button id="btnBatchSelectAll" type="button" class="hidden">全選</button>
+      <button id="btnBatchTag" type="button" class="hidden">加入分類</button>
+      <button id="btnBatchCancel" type="button" class="hidden">取消</button>
+    </div>
   </div>
 
   <!-- Card catalog -->
