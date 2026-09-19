@@ -130,19 +130,29 @@ const CardOCR = (() => {
     return lines.join('\n');
   }
 
+  function hasUsefulContact(text) {
+    const t = text || '';
+    const hasEmail = /[\w.%+-]+\s*@\s*[\w.-]+\.[A-Za-z]{2,}/.test(t);
+    const hasPhone = /(?:\+?886[-\s]?)?\(?0\d{1,2}\)?[-\s]?\d{3,4}[-\s]?\d{4}/.test(t);
+    const hasCompany = /公司|銀行|有限公司|Inc\.?|Ltd\.?|Corp/i.test(t);
+    return (hasEmail && hasPhone) || (hasPhone && hasCompany);
+  }
+
   async function recognize(image, onProgress) {
     const w = await getWorker(onProgress);
     const variants = typeof image === 'string' ? await makeVariants(image) : [{ id: 'input', image }];
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const maxPasses = isIOS ? Math.min(2, variants.length) : variants.length;
     const results = [];
-    for (let i = 0; i < variants.length; i++) {
-      onProgress && onProgress({ status: 'ocr-pass', pass: i + 1, total: variants.length, progress: i / variants.length });
+    for (let i = 0; i < maxPasses; i++) {
+      onProgress && onProgress({ status: 'ocr-pass', pass: i + 1, total: maxPasses, progress: i / maxPasses });
       await w.setParameters({ tessedit_pageseg_mode: i === 1 ? '6' : '11' });
       const { data } = await w.recognize(variants[i].image);
       const text = (data.text || '').trim();
       const confidence = Number.isFinite(data.confidence) ? Math.round(data.confidence) : 0;
       const score = textQuality(text) + confidence * 0.7;
       results.push({ text, confidence, score, variant: variants[i].id });
-      if (i === 0 && confidence >= 90 && textQuality(text) > 80) break;
+      if (i === 0 && ((confidence >= 72 && hasUsefulContact(text)) || (confidence >= 88 && textQuality(text) > 70))) break;
     }
     results.sort((a, b) => b.score - a.score);
     const best = results[0] || { text: '', confidence: 0, score: 0, variant: 'none' };
