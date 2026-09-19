@@ -127,7 +127,8 @@
       rawText: item.rawText || '',
       fieldConfidence,
       duplicateStatus: item.duplicateStatus || '',
-      previousId: item.previousId || ''
+      previousId: item.previousId || '',
+      saveAction: item.saveAction || 'new'
     };
   }
 
@@ -149,8 +150,9 @@
       let match = existing.find(c => email && norm(c.email) === email)
         || existing.find(c => mobile && norm(c.mobile) === mobile)
         || existing.find(c => name && company && norm(c.name) === name && norm(c.company) === company);
-      if (!match) continue;
+      if (!match) { r.saveAction = 'new'; continue; }
       r.previousId = match.id;
+      if (!['replace','merge','skip'].includes(r.saveAction)) r.saveAction = 'skip';
       const changes = [];
       if (r.title && match.title && norm(r.title) !== norm(match.title)) changes.push(`職稱：${match.title} → ${r.title}`);
       if (r.phone && match.phone && norm(r.phone) !== norm(match.phone)) changes.push('公司電話不同');
@@ -307,7 +309,13 @@
               <div>🌐 ${esc(r.website || '—')} ${confidenceBadge(r,'website',r.website)}</div>
               <div>📍 ${esc(r.address || r.companyAddress || '—')} ${confidenceBadge(r,'address',r.address || r.companyAddress)}</div>
             </div>
-            ${r.duplicateStatus ? `<div class="ai-duplicate-note">${esc(r.duplicateStatus)}</div>` : ''}
+            ${r.duplicateStatus ? `<div class="ai-duplicate-note">${esc(r.duplicateStatus)}
+              <div class="ai-save-actions">
+                <button type="button" data-action="skip" class="${r.saveAction==='skip'?'active':''}">保留舊資料</button>
+                <button type="button" data-action="merge" class="${r.saveAction==='merge'?'active':''}">補齊空白欄位</button>
+                <button type="button" data-action="replace" class="${r.saveAction==='replace'?'active':''}">用新名片更新</button>
+              </div>
+            </div>` : ''}
           </article>`;
         }).join('')}
       </section>`).join('');
@@ -321,6 +329,10 @@
         results[i].selected = e.target.checked;
       });
       card.querySelector('.ai-result-edit')?.addEventListener('click', () => editResult(i));
+      card.querySelectorAll('.ai-save-actions button').forEach(btn => btn.addEventListener('click', () => {
+        results[i].saveAction = btn.dataset.action;
+        renderResults();
+      }));
     });
   }
 
@@ -336,6 +348,7 @@
     try {
       for (const r of chosen) {
         const now = Date.now();
+        if (r.previousId && r.saveAction === 'skip') continue;
         let photo = r.cropImage || photos[r.sourceIndex]?.dataUrl || '';
         try {
           if (photo && window.CardCamera?.normalizeForStorage) photo = await CardCamera.normalizeForStorage(photo);
@@ -344,18 +357,36 @@
         try {
           if (photo && window.CardCamera?.makeThumbnail) thumb = await CardCamera.makeThumbnail(photo);
         } catch (_) {}
-        await CardDB.put({
-          id: uid(),
+        const incoming = {
           name:r.name, nameEn:r.nameEn, company:r.company, title:r.title,
           mobile:r.mobile, phone:r.phone, phone2:r.phone2, fax:r.fax,
           email:r.email, website:r.website, address:r.address,
           department:r.department, extension:r.extension, taxId:r.taxId,
           companyAddress:r.companyAddress, postalCode:r.postalCode, country:r.country,
-          category:r.category || '未分類', note:[batchSource ? '來源：' + batchSource : '', r.note || ''].filter(Boolean).join(' · '),
-          favorite:false, rawText:r.rawText || '', photo, thumb,
-          backPhoto:'', backThumb:'', createdAt:now, updatedAt:now,
-          aiBatch:true, aiConfidence:r.confidence || 0
-        });
+          category:r.category || '未分類',
+          note:[batchSource ? '來源：' + batchSource : '', r.note || ''].filter(Boolean).join(' · '),
+          rawText:r.rawText || '', photo, thumb, aiBatch:true, aiConfidence:r.confidence || 0
+        };
+        if (r.previousId && (r.saveAction === 'merge' || r.saveAction === 'replace')) {
+          const old = (window.CardKeeperBatch?.cards || []).find(c => c.id === r.previousId);
+          if (!old) throw new Error('existing-card-missing');
+          const merged = {...old};
+          if (r.saveAction === 'replace') {
+            Object.entries(incoming).forEach(([k,v]) => { if (v !== '' && v != null) merged[k] = v; });
+          } else {
+            Object.entries(incoming).forEach(([k,v]) => { if ((merged[k] === '' || merged[k] == null) && v !== '' && v != null) merged[k] = v; });
+            if (incoming.note) merged.note = [old.note, incoming.note].filter(Boolean).join(' · ');
+          }
+          merged.id = old.id;
+          merged.createdAt = old.createdAt || now;
+          merged.updatedAt = now;
+          await CardDB.put(merged);
+        } else {
+          await CardDB.put({
+            id:uid(), ...incoming, favorite:false,
+            backPhoto:'', backThumb:'', createdAt:now, updatedAt:now
+          });
+        }
         saved++;
       }
       setStatus(`已儲存 ${saved} 張名片。返回首頁即可看到資料。`);
