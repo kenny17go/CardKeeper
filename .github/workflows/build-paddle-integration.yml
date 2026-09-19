@@ -32,6 +32,14 @@ jobs:
       - name: Build browser bundle
         working-directory: paddle-integration
         run: npm run build
+      - name: Verify integration bundle exports CardPaddleOCR
+        working-directory: paddle-integration
+        run: |
+          test -s dist/paddle-ocr.js
+          grep -q "CardPaddleOCR" dist/paddle-ocr.js
+          grep -q "cardpaddle-ready" dist/paddle-ocr.js
+          echo "Verified Paddle integration export and ready event"
+
       - name: Commit built bundle
         run: |
           git config user.name "github-actions[bot]"
