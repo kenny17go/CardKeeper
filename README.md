@@ -1,77 +1,24 @@
-# CardKeeper Smart Scan v4.2 — iPhone Camera Hotfix
+# CardKeeper v5 Stable
 
-## v4.2 這次修正
-- 即時找邊不再使用 OpenCV/WASM 主執行緒運算；改為低解析度輕量影格分析，避免 iPhone Safari 控制列卡死。
-- 「取消／手動快門／相簿」控制列提高獨立圖層與觸控優先權。
-- 相簿改為原生 file input 直接覆蓋按鈕，不以 JavaScript 模擬點擊。
-- 相機移除強制 16:9，並在瀏覽器支援時將 zoom 設為接近 1×、focusMode 設為 continuous，降低近拍時鏡頭突然拉太近。
-- 自動拍攝仍需約 0.9 秒穩定；新增「四邊必須完整留在畫面內」條件，太靠近不會自動拍。
-- 拍照後仍使用高解析 OpenCV 做名片四角偵測與透視校正。
-- Service Worker 更新為 v4.2，並改成 network-first，降低 iPhone 持續吃到舊版快取的機率。
+本版以穩定性為主，不新增高風險掃描功能。
 
+## v5 Stable 重點
+- 保留既有名片、搜尋、分類、正反面、重複合併、vCard 與免費 OCR。
+- iPhone 拍照後維持安全模式：不執行高負載 OpenCV 透視流程。
+- Service Worker 改為 v5，只有頁面導航才可 fallback 到 index.html；JS/CSS/圖片失敗不再錯回 HTML。
+- IndexedDB schema 升至 v2，採非破壞 migration，舊名片資料保留。
+- 新增照片儲存正規化工具，供後續逐步降低 IndexedDB 空間壓力。
+- 版本名稱統一為 v5 Stable。
 
-## v4.1 Debug / Auto Capture
+## 原則
+任何 OCR、找邊或網路元件失敗，都不能阻止使用者返回、重拍、從相簿選圖或手動輸入。
 
-- 修正 iPhone/Safari 即時 OpenCV 找邊可能占用主執行緒，導致快門、取消、相簿按鈕難以操作。
-- 手動快門永遠可用，不需要先偵測到名片四角。
-- 相簿改用明確按鈕觸發 file picker，提升 iOS PWA 相容性。
-- 加入自動拍攝：四角穩定、清晰度及信心達標約 0.9 秒後自動拍攝。
-- 可在相機畫面切換「自動拍攝：開 / 關」。
-- 即時找邊降至低解析度與較低更新頻率；拍照後仍使用完整解析度重新找邊與透視校正。
+## 部署
+將 repository 根目錄部署為 GitHub Pages。更新後首次請先以 Safari 開啟網站一次，讓新的 Service Worker 接管，再從主畫面 PWA 測試。
 
-# CardKeeper Smart Scan v4
-
-可直接部署到 GitHub Pages 的純前端名片掃描 / 管理 PWA。
-
-## v4 新功能
-
-- 即時相機名片四角偵測與綠色吸附框（OpenCV.js）
-- 拍照後高解析度重新找邊、透視校正與 OCR v2
-- 單張 / 連續掃描模式；連續模式儲存後自動返回相機
-- 正面 + 背面名片保存，詳情頁點名片可切換正反面
-- 重複名片智慧偵測：Email、手機、姓名、公司加權比對
-- 重複資料可智慧合併或保留新名片
-- 多電話解析：手機、公司電話、其他電話、分機文字、傳真
-- vCard 匯出同步包含多電話與傳真
-- iOS 原生風格首頁：大標題、摘要數字、iOS 搜尋框、分類膠囊、白色列表卡片
-- IndexedDB 本機保存、JSON 備份 / 還原、PWA 安裝
-
-## GitHub Pages 部署
-
-1. 建立一個 GitHub repository。
-2. 將本 ZIP **解壓後的所有檔案與資料夾**放在 repository 根目錄；不要再多包一層資料夾。
-3. GitHub → Settings → Pages。
-4. Build and deployment 選 `Deploy from a branch`。
-5. Branch 選 `main` / `(root)` 並儲存。
-6. 使用 GitHub Pages 提供的 HTTPS 網址開啟。
-7. iPhone Safari 可用「分享 → 加入主畫面」安裝成 PWA。
-
-> 相機 API 必須在 HTTPS 或 localhost 執行，因此直接用 GitHub Pages 最方便。
-
-## 使用方式
-
-- 點右下角相機開始掃描。
-- 名片進入畫面後，若偵測成功會看到綠色四角吸附框。
-- 可切換「單張」或「連續掃描」。
-- OCR 後可在確認頁點「掃描名片背面」。
-- 儲存前若偵測到疑似重複名片，會提供「智慧合併」或「仍然建立新名片」。
-- 已存名片若有背面，在詳情頁點名片圖片即可切換正反面。
-
-## 技術說明
-
-- OCR：Tesseract.js 5
-- 找邊 / 透視：OpenCV.js 4.13
+## 技術
+- OCR：Tesseract.js 5（CDN，首次載入需網路）
+- 桌面找邊：OpenCV.js；iPhone 拍照後預設略過高負載透視
 - 儲存：IndexedDB
-- 聯絡人：vCard 3.0 + Web Share / `.vcf` fallback
+- 聯絡人：vCard 3.0
 - PWA：Manifest + Service Worker
-
-## 瀏覽器限制
-
-純 Web App 無法繞過 iOS 權限直接靜默寫入通訊錄，因此「加入聯絡人」會開啟 iOS 分享 / VCF 匯入流程。即時找邊與 OCR 使用 CDN 程式庫，第一次開啟需要網路；名片資料本身只保存在本機 IndexedDB，除非使用者自行匯出。
-
-## v4.3 iPhone Processing Hotfix
-- iPhone/iPad 拍照後預設略過高負載 OpenCV.js 主執行緒透視校正，避免卡在「找邊」。
-- 快門改為依畫面名片框直接裁切後辨識，降低白畫面/空影像風險。
-- OCR 加入 22 秒保護逾時，失敗會直接進入手動確認，不再卡死。
-- 處理頁新增「取消處理，返回相機」與「略過辨識，直接手動輸入」。
-- Service Worker cache 升級至 v4.3。
