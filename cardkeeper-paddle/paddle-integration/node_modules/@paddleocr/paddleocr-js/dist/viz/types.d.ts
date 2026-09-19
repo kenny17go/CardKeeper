@@ -1,0 +1,11 @@
+/** An RGB color as a 3-element tuple of 0-255 integers. */
+export declare type RgbColor = [number, number, number];
+export interface FontConfig {
+    /** CSS font-family name. */
+    family: string;
+    /** Font source: URL string or ArrayBuffer. */
+    source: string | ArrayBuffer;
+    /** FontFace descriptors (weight, style, etc.). */
+    descriptors?: FontFaceDescriptors;
+}
+//# sourceMappingURL=types.d.ts.map
