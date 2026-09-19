@@ -31,7 +31,7 @@
     <div>
       <div class="home-title-meta">
         <p class="eyebrow">CARDKEEPER</p>
-        <span class="app-version">AI Batch Test · 5.2.6</span>
+        <span class="app-version">Import Test · 5.3.0</span>
       </div>
       <h1>名片</h1>
     </div>
@@ -66,7 +66,7 @@
   </div>
 
   <!-- Floating capture button -->
-  <button id="btnAiBatch" class="ai-batch-fab" aria-label="AI 批次掃描">AI 批次</button>
+  <button id="btnAiBatch" class="ai-batch-fab" aria-label="批次匯入">批次匯入</button>
   <button id="btnCapture" class="fab" aria-label="拍攝名片">
     <svg viewBox="0 0 24 24" width="26" height="26"><path fill="currentColor" d="M9.17 4l-1.83 2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.34L14.83 4H9.17zM12 9a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
   </button>
@@ -74,16 +74,18 @@
 </div>
 
 <!-- ===================== AI Batch Scan Screen ===================== -->
-<section id="screenAiBatch" class="screen hidden" aria-label="AI 批次掃描">
+<section id="screenAiBatch" class="screen hidden" aria-label="批次匯入">
   <header class="sheet-header">
     <button id="btnAiBatchBack" class="icon-btn" aria-label="返回">‹</button>
-    <h2>AI 批次掃描</h2>
+    <h2>批次匯入</h2>
     <span class="ai-batch-count" id="aiBatchCount">0 張照片</span>
   </header>
   <div class="ai-batch-body">
     <div class="ai-batch-intro">
-      <h3>一次處理多張名片</h3>
-      <p>可拍一張包含多張名片的照片，或從相簿一次選多張。AI 會切割每張名片、辨識欄位並分類，再讓你確認後存入。</p>
+      <h3>從其他名片 App 匯入</h3>
+      <p>保留 CardKeeper 原本的相機＋OCR 掃描；另外可匯入其他名片 App 產生的 CSV。資料會先預覽、確認、比對重複，再由你決定是否存入。</p>
+      <label class="btn-brass full">📄 匯入名片 CSV<input id="cardCsvImport" type="file" accept=".csv,text/csv,text/plain" class="hidden"></label>
+      <p class="backup-note">目前已相容「姓名、公司、職稱、電話、Email、網站、地址、LINE ID、LinkedIn、統編、備註、建立日期」格式；匯入全程在此裝置處理，不會上傳雲端。</p>
     </div>
     <div class="ai-batch-actions">
       <label class="btn-brass full">📷 拍攝一張<input id="aiBatchCameraInput" type="file" accept="image/*" capture="environment" class="hidden"></label>
@@ -91,8 +93,8 @@
     </div>
     <div id="aiBatchPreviewGrid" class="ai-batch-preview-grid"></div>
     <p id="aiBatchEmpty" class="ai-batch-empty">尚未加入照片</p>
-    <button id="btnAiAnalyze" class="btn-brass full" disabled>✨ 交給 AI 分析</button>
-    <p class="backup-note">測試版先完成批次流程與資料回存；AI 後端另外連接，不影響原本單張掃描。</p>
+    <button id="btnAiAnalyze" class="btn-outline full" disabled>🧪 模擬 AI 分析（測試）</button>
+    <p class="backup-note">照片模擬 AI 功能保留作測試；正式新增的是 CSV 批次匯入，不影響原本單張掃描。</p>
     <details class="ai-batch-test-tools">
       <summary>測試工具</summary>
       <p class="backup-note">可匯入 AI 結果 JSON，先測試「確認 → 批次存入」流程。</p>
@@ -186,6 +188,8 @@
         <span>💼 職稱</span>
         <input name="title" type="text" placeholder="業務經理">
       </label>
+      <label class="field"><span>🏬 部門</span><input name="department" type="text" placeholder="企業金融部"></label>
+      <label class="field"><span>🧾 公司統編</span><input name="taxId" type="text" inputmode="numeric" placeholder="12345678"></label>
       <label class="field">
         <span>📱 手機</span>
         <input name="mobile" type="tel" placeholder="0912-345-678">
@@ -198,6 +202,7 @@
         <span>☎️ 其他電話</span>
         <input name="phone2" type="tel" placeholder="03-1234-5678">
       </label>
+      <label class="field"><span>🔢 分機</span><input name="extension" type="text" inputmode="numeric" placeholder="1234"></label>
       <label class="field">
         <span>📠 傳真</span>
         <input name="fax" type="tel" placeholder="02-1234-5679">
@@ -214,6 +219,9 @@
         <span>📍 地址</span>
         <textarea name="address" rows="2" placeholder="台北市信義區..."></textarea>
       </label>
+      <label class="field"><span>🏢 公司地址</span><textarea name="companyAddress" rows="2" placeholder="與主要地址不同時填寫"></textarea></label>
+      <label class="field"><span>📮 郵遞區號</span><input name="postalCode" type="text" inputmode="numeric" placeholder="110"></label>
+      <label class="field"><span>🌏 國家 / 地區</span><input name="country" type="text" placeholder="台灣"></label>
       <label class="field">
         <span>🏷️ 分類</span>
         <input name="category" type="text" placeholder="自動分類，可自行修改" list="categoryOptions">
