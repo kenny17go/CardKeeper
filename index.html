@@ -31,7 +31,7 @@
     <div>
       <div class="home-title-meta">
         <p class="eyebrow">CARDKEEPER</p>
-        <span class="app-version">v5 Stable · 5.0.5</span>
+        <span class="app-version">AI Batch Test · 5.2.0</span>
       </div>
       <h1>名片</h1>
     </div>
@@ -66,11 +66,45 @@
   </div>
 
   <!-- Floating capture button -->
+  <button id="btnAiBatch" class="ai-batch-fab" aria-label="AI 批次掃描">AI 批次</button>
   <button id="btnCapture" class="fab" aria-label="拍攝名片">
     <svg viewBox="0 0 24 24" width="26" height="26"><path fill="currentColor" d="M9.17 4l-1.83 2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.34L14.83 4H9.17zM12 9a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
   </button>
 
 </div>
+
+<!-- ===================== AI Batch Scan Screen ===================== -->
+<section id="screenAiBatch" class="screen hidden" aria-label="AI 批次掃描">
+  <header class="sheet-header">
+    <button id="btnAiBatchBack" class="icon-btn" aria-label="返回">‹</button>
+    <h2>AI 批次掃描</h2>
+    <span class="ai-batch-count" id="aiBatchCount">0 張照片</span>
+  </header>
+  <div class="ai-batch-body">
+    <div class="ai-batch-intro">
+      <h3>一次處理多張名片</h3>
+      <p>可拍一張包含多張名片的照片，或從相簿一次選多張。AI 會切割每張名片、辨識欄位並分類，再讓你確認後存入。</p>
+    </div>
+    <div class="ai-batch-actions">
+      <label class="btn-brass full">📷 拍攝一張<input id="aiBatchCameraInput" type="file" accept="image/*" capture="environment" class="hidden"></label>
+      <label class="btn-outline full">🖼️ 從相簿多選<input id="aiBatchFiles" type="file" accept="image/*" multiple class="hidden"></label>
+    </div>
+    <div id="aiBatchPreviewGrid" class="ai-batch-preview-grid"></div>
+    <p id="aiBatchEmpty" class="ai-batch-empty">尚未加入照片</p>
+    <button id="btnAiAnalyze" class="btn-brass full" disabled>✨ 交給 AI 分析</button>
+    <p class="backup-note">測試版先完成批次流程與資料回存；AI 後端另外連接，不影響原本單張掃描。</p>
+    <details class="ai-batch-test-tools">
+      <summary>測試工具</summary>
+      <p class="backup-note">可匯入 AI 結果 JSON，先測試「確認 → 批次存入」流程。</p>
+      <label class="btn-outline full">匯入 AI 結果 JSON<input id="aiBatchResultFile" type="file" accept="application/json" class="hidden"></label>
+    </details>
+    <section id="aiBatchResults" class="ai-batch-results hidden">
+      <div class="ai-batch-results-head"><div><strong id="aiBatchResultCount">0</strong> 張名片</div><button id="btnAiSelectAll" class="mini-link" type="button">全選</button></div>
+      <div id="aiBatchResultList"></div>
+      <button id="btnAiSaveSelected" class="btn-brass full">儲存勾選名片</button>
+    </section>
+  </div>
+</section>
 
 <!-- ===================== Camera / Capture Screen ===================== -->
 <section id="screenCamera" class="screen hidden" aria-label="拍攝名片">
@@ -289,6 +323,7 @@
 <script src="js/ocr.js"></script>
 <script src="js/vcard.js"></script>
 <script src="js/camera.js"></script>
+<script src="js/ai-batch.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
