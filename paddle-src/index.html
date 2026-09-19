@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CardKeeper PaddleOCR Test</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;color:#172033;background:#f4f6fa}
+*{box-sizing:border-box}body{margin:0;padding:20px 16px 40px}.wrap{max-width:760px;margin:auto}
+h1{font-size:28px;margin:6px 0 4px}.sub{color:#667085;margin:0 0 18px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:16px;margin:14px 0;box-shadow:0 8px 24px rgba(15,23,42,.05)}
+label.pick{display:block;padding:14px;border:1.5px dashed #94a3b8;border-radius:14px;text-align:center;font-weight:700}
+input[type=file]{display:none}img{width:100%;border-radius:12px;margin-top:12px;display:none}
+button{width:100%;border:0;border-radius:14px;padding:14px;font-size:17px;font-weight:700;background:#1473e6;color:white;margin-top:12px}
+button:disabled{opacity:.45}.status{font-weight:700}.muted{color:#667085}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.metric{background:#f8fafc;border-radius:12px;padding:12px}.metric b{display:block;font-size:20px}
+pre{white-space:pre-wrap;word-break:break-word;background:#0f172a;color:#f8fafc;padding:14px;border-radius:12px;min-height:180px}
+.error{color:#b42318;white-space:pre-wrap}.small{font-size:13px;color:#667085}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>PaddleOCR 測試 v2</h1>
+<p class="sub">CardKeeper 獨立實驗頁 · 正式 Vite 打包版 · 不會寫入名片資料庫</p>
+<div class="card">
+<label class="pick">選擇同一張名片照片<input id="file" type="file" accept="image/*"></label>
+<img id="preview" alt="名片預覽">
+<button id="run" disabled>開始 PaddleOCR</button>
+<p class="small">第一次會下載/初始化模型；第二次較接近日常速度。</p>
+</div>
+<div class="card">
+<div class="status" id="status">尚未開始</div>
+<div class="grid" style="margin-top:12px">
+<div class="metric"><span class="muted">模型載入</span><b id="initMs">—</b></div>
+<div class="metric"><span class="muted">OCR 辨識</span><b id="ocrMs">—</b></div>
+<div class="metric"><span class="muted">偵測框數</span><b id="boxes">—</b></div>
+<div class="metric"><span class="muted">平均信心</span><b id="score">—</b></div>
+</div>
+<div id="runtime" class="small" style="margin-top:10px"></div>
+<div id="error" class="error"></div>
+</div>
+<div class="card"><h2>辨識文字</h2><pre id="text">等待辨識…</pre></div>
+</div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
