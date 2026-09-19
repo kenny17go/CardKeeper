@@ -872,6 +872,13 @@
     showToast('已清空所有名片');
   });
 
+
+  window.CardKeeperBatch = {
+    get cards(){ return allCards; },
+    findDuplicateCandidate(card){ return findDuplicate(card); },
+    reload: loadCards
+  };
+
   // ===================================================
   // Init
   // ===================================================
