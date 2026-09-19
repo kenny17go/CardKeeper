@@ -161,9 +161,9 @@
   }
 
   function updateBatchTagBar(list = filteredCards()) {
-    const bar = el('batchTagBar'); if (!bar) return;
+    const bar = el('batchTagBar'); const row = el('searchBatchRow'); if (!bar || !row) return;
     const hasSearch = !!searchQuery.trim();
-    bar.classList.toggle('hidden', !hasSearch);
+    row.classList.toggle('hidden', !hasSearch);
     if (!hasSearch) { batchSelectMode=false; batchSelectedIds.clear(); return; }
     el('batchTagSummary').textContent = batchSelectMode ? `${batchSelectedIds.size} / ${list.length} 張已選` : `${list.length} 張符合「${searchQuery.trim()}」`;
     el('btnBatchSelect')?.classList.toggle('hidden', batchSelectMode);
