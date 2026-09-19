@@ -300,11 +300,40 @@
     if (!file) return;
     try {
       const data = JSON.parse(await file.text());
-      const list = Array.isArray(data) ? data : (data.cards || data.results || []);
+      let list = [];
+      if (Array.isArray(data)) {
+        list = data;
+      } else if (data?.schemaVersion === '1.0' && Array.isArray(data.cards)) {
+        list = data.cards.map((card, index) => {
+          const fields = card.fields || {};
+          const crop = card.crop || {};
+          for (const key of ['x','y','width','height']) {
+            if (crop[key] != null && (Number(crop[key]) < 0 || Number(crop[key]) > 1)) {
+              throw new Error('crop-range');
+            }
+          }
+          const confidence = Number(card.confidence || 0);
+          if (confidence < 0 || confidence > 100) throw new Error('confidence-range');
+          for (const value of Object.values(card.fieldConfidence || {})) {
+            const n = Number(value);
+            if (n < 0 || n > 100) throw new Error('field-confidence-range');
+          }
+          return {
+            ...fields,
+            sourceIndex: Number.isInteger(card.sourceIndex) ? card.sourceIndex : index,
+            cropImage: card.cropImage || '',
+            confidence,
+            fieldConfidence: card.fieldConfidence || {},
+            rawText: card.rawText || ''
+          };
+        });
+      } else {
+        list = data.cards || data.results || [];
+      }
       if (!Array.isArray(list) || !list.length) throw new Error('empty');
       results = list.map(normalizeResult);
       compareWithExisting();
-      setStatus('已載入 AI 結果，已自動分組並比對既有名片。');
+      setStatus('已載入 AI 結果，格式驗證完成，並已自動分組及比對既有名片。');
       renderResults();
     } catch (err) {
       console.error(err);
