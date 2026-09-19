@@ -6,7 +6,7 @@ export default defineConfig({
     rollupOptions: {
       input: 'paddle-entry.js',
       output: {
-        entryFileNames: 'paddle-ocr.js',
+        entryFileNames: 'paddle-entry-513.js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]'
       }
