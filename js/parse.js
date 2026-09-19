@@ -8,7 +8,11 @@ const CardParse = (() => {
     {cat:'金融/保險',kws:['銀行','保險','金控','證券','投信','投顧','Bank','Insurance','Capital','Financial']},
     {cat:'餐飲',kws:['餐廳','餐飲','咖啡','食品','Restaurant','Cafe','Food']},{cat:'醫療/健康',kws:['醫院','診所','藥局','健康','醫師','Clinic','Hospital','Medical','Health']},
     {cat:'設計/創意',kws:['設計','工作室','廣告','攝影','Design','Studio','Creative','Media']},{cat:'教育',kws:['學校','教育','大學','學院','School','University','Education']},
-    {cat:'房地產/建築',kws:['建設','建築','房屋','地產','營造','Real Estate','Construction']},{cat:'製造/工業',kws:['工業','製造','機械','Manufacturing','Industrial']},
+    {cat:'房地產/建築',kws:['建設','建築','房屋','地產','營造','Real Estate','Construction']},{cat:'製造/工業',kws:['工業','製造','機械','電子','電機','半導體','材料','Manufacturing','Industrial','Semiconductor','Electronics']},
+    {cat:'運輸/物流',kws:['運輸','物流','貨運','航運','航空','快遞','Logistics','Transportation','Shipping','Airlines']},
+    {cat:'汽車/交通',kws:['汽車','車業','車輛','Auto','Automobile','Motor']},
+    {cat:'旅遊/飯店',kws:['旅行','旅遊','飯店','酒店','民宿','Tour','Travel','Hotel','Resort']},
+    {cat:'政府/公協會',kws:['政府','公所','協會','公會','基金會','財團法人','Government','Association','Foundation']},
     {cat:'零售/貿易',kws:['貿易','商行','零售','Trading','Retail']},{cat:'法律/顧問',kws:['律師','事務所','會計師','顧問','Law','Legal','Consulting']}
   ];
   const clean=s=>(s||'').replace(/[|¦]/g,'I').replace(/[•●◆■]+/g,' ').replace(/\s+/g,' ').trim();
