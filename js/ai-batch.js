@@ -292,9 +292,71 @@
   $('aiBatchFiles')?.addEventListener('change', async e => {
     await addFiles(e.target.files); e.target.value = '';
   });
-  $('btnAiAnalyze')?.addEventListener('click', () => {
-    setStatus('批次上傳介面已完成。下一階段接 AI 後端後，這裡會自動切割、OCR、分類並回傳確認清單。');
-  });
+  function mockAiCard(photoIndex, cardIndex = 0) {
+    const samples = [
+      {
+        name:'王志明', company:'星辰科技股份有限公司', title:'業務經理',
+        mobile:'0912-345-678', phone:'02-2345-6789', email:'ming.wang@example.com',
+        category:'科技', confidence:96,
+        fieldConfidence:{name:97,company:99,title:92,mobile:98,phone:93,email:96}
+      },
+      {
+        name:'林怡君', company:'國際商業銀行', title:'副理',
+        mobile:'', phone:'02-8765-4321', email:'yj.lin@example.com',
+        category:'金融', confidence:78,
+        fieldConfidence:{name:90,company:96,title:68,phone:84,email:62}
+      },
+      {
+        name:'陳建宏', company:'遠景顧問有限公司', title:'資深顧問',
+        mobile:'0988-123-456', phone:'', email:'jason.chen@example.com',
+        category:'顧問', confidence:88,
+        fieldConfidence:{name:92,company:91,title:86,mobile:95,email:87}
+      }
+    ];
+    const s = samples[(photoIndex + cardIndex) % samples.length];
+    return normalizeResult({
+      ...s,
+      sourceIndex: photoIndex,
+      cropImage: photos[photoIndex]?.dataUrl || '',
+      rawText: [s.name, s.company, s.title, s.mobile, s.phone, s.email].filter(Boolean).join('\n'),
+      note: '本地模擬 AI 結果',
+      selected: true
+    }, results.length + cardIndex);
+  }
+
+  async function runMockAnalysis() {
+    if (!photos.length) return;
+    const btn = $('btnAiAnalyze');
+    btn.disabled = true;
+    results = [];
+    $('aiBatchResults').classList.add('hidden');
+
+    try {
+      setStatus('步驟 1/4 · 模擬偵測名片位置…');
+      await new Promise(r => setTimeout(r, 450));
+      setStatus('步驟 2/4 · 模擬切割與拉正…');
+      await new Promise(r => setTimeout(r, 450));
+      setStatus('步驟 3/4 · 模擬 OCR 與欄位整理…');
+      await new Promise(r => setTimeout(r, 550));
+
+      photos.forEach((_, photoIndex) => {
+        // 第一張照片故意模擬同一畫面含兩張名片，
+        // 其餘照片各一張，方便先驗證多卡流程的 UI。
+        const count = photoIndex === 0 ? 2 : 1;
+        for (let cardIndex = 0; cardIndex < count; cardIndex++) {
+          results.push(mockAiCard(photoIndex, cardIndex));
+        }
+      });
+
+      compareWithExisting();
+      setStatus('步驟 4/4 · 已完成分組、低信心標示與既有名片比對。這是本地模擬，不會產生 AI 費用。');
+      renderResults();
+    } finally {
+      btn.disabled = photos.length === 0;
+    }
+  }
+
+  $('btnAiAnalyze')?.addEventListener('click', runMockAnalysis);
   $('aiBatchResultFile')?.addEventListener('change', async e => {
     const file = e.target.files?.[0]; e.target.value = '';
     if (!file) return;
