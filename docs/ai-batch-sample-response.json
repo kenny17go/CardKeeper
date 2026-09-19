@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "1.0",
+  "batchId": "demo-batch-001",
+  "cards": [
+    {
+      "sourceImageId": "p_001",
+      "sourceIndex": 0,
+      "crop": { "x": 0.05, "y": 0.08, "width": 0.42, "height": 0.34, "rotation": 0 },
+      "cropImage": "",
+      "confidence": 95,
+      "fields": {
+        "name": "陳宏欣",
+        "nameEn": "",
+        "company": "台北富邦銀行",
+        "title": "經理",
+        "mobile": "0912-345-678",
+        "phone": "02-1234-5678",
+        "phone2": "",
+        "fax": "",
+        "email": "chen@example.com",
+        "website": "",
+        "address": "台北市",
+        "category": "金融",
+        "note": ""
+      },
+      "fieldConfidence": {
+        "name": 96,
+        "company": 99,
+        "title": 91,
+        "mobile": 98,
+        "phone": 90,
+        "email": 95
+      },
+      "rawText": "陳宏欣\n台北富邦銀行\n經理\n0912-345-678\nchen@example.com"
+    },
+    {
+      "sourceImageId": "p_001",
+      "sourceIndex": 0,
+      "crop": { "x": 0.52, "y": 0.09, "width": 0.41, "height": 0.33, "rotation": 0 },
+      "cropImage": "",
+      "confidence": 72,
+      "fields": {
+        "name": "林怡君",
+        "nameEn": "",
+        "company": "國泰世華銀行",
+        "title": "副理",
+        "mobile": "",
+        "phone": "02-8765-4321",
+        "phone2": "",
+        "fax": "",
+        "email": "lin@example.com",
+        "website": "",
+        "address": "台北市",
+        "category": "金融",
+        "note": ""
+      },
+      "fieldConfidence": {
+        "name": 88,
+        "company": 94,
+        "title": 68,
+        "phone": 82,
+        "email": 61
+      },
+      "rawText": "林怡君\n國泰世華銀行\n副理\n02-8765-4321\nlin@example.com"
+    }
+  ],
+  "warnings": []
+}
