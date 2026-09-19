@@ -749,3 +749,9 @@ body{background:var(--ios-bg);}
 .batch-check{position:absolute;z-index:3;right:10px;top:10px;width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#fff;border:2px solid #c7c7cc;color:#fff;font-weight:800}
 .card-item.batch-selected{box-shadow:0 0 0 2px var(--ios-blue),0 4px 14px rgba(0,122,255,.12)}
 .card-item.batch-selected .batch-check{background:var(--ios-blue);border-color:var(--ios-blue)}
+
+/* 5.3.3 visible search batch toolbar */
+.search-batch-row{display:flex;align-items:center;gap:10px;margin:8px 2px 10px;padding:9px 10px;background:#eaf2ff;border-radius:14px}
+.search-batch-row>span{font-size:13px;font-weight:700;color:#1769e0;white-space:nowrap}
+.search-batch-row .batch-tag-bar{margin-left:auto;padding:0}
+.search-batch-row .batch-tag-bar button{background:#fff;box-shadow:0 1px 4px rgba(22,32,51,.08)}
