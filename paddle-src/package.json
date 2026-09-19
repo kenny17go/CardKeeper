@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@paddleocr/paddleocr-js": "0.4.2"
+  },
+  "devDependencies": {
+    "vite": "^7.1.5"
+  }
+}
