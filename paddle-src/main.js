@@ -26,7 +26,7 @@ function timeout(promise, ms, label) {
   ]).finally(() => clearTimeout(timer));
 }
 
-async function downscale(file, maxSide = 1600) {
+async function downscale(file, maxSide = 960) {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
   if (scale === 1) return file;
@@ -79,14 +79,14 @@ $('run').addEventListener('click', async () => {
     const ocr = await getEngine();
 
     $('status').textContent = '正在縮小測試影像…';
-    const input = await timeout(downscale(selectedFile, 1600), 8000, '影像縮放');
+    const input = await timeout(downscale(selectedFile, 960), 8000, '影像縮放');
 
     $('status').textContent = '正在辨識文字…';
     const t0 = performance.now();
     const [result] = await timeout(ocr.predict(input, {
-      textDetLimitSideLen: 1280,
+      textDetLimitSideLen: 960,
       textRecScoreThresh: 0.35
-    }), 45000, 'OCR 辨識');
+    }), 20000, 'OCR 辨識');
     const elapsed = Math.round(performance.now() - t0);
 
     const items = result?.items || [];
