@@ -13,8 +13,23 @@ function timeout(promise, ms, label) {
   ]).finally(() => clearTimeout(timer));
 }
 
-async function downscale(dataUrl, maxSide = 720) {
-  const blob = await (await fetch(dataUrl)).blob();
+async function downscale(image, maxSide = 720) {
+  let blob;
+  if (image instanceof Blob) {
+    blob = image;
+  } else if (typeof image === 'string' && image.startsWith('data:')) {
+    const comma = image.indexOf(',');
+    const meta = image.slice(0, comma);
+    const bytes = atob(image.slice(comma + 1));
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    const type = /data:([^;]+)/.exec(meta)?.[1] || 'image/jpeg';
+    blob = new Blob([arr], { type });
+  } else {
+    const response = await fetch(image);
+    if (!response.ok) throw new Error('影像讀取失敗 ' + response.status);
+    blob = await response.blob();
+  }
   const bitmap = await createImageBitmap(blob);
   const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
   if (scale === 1) { bitmap.close?.(); return blob; }
