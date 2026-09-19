@@ -35,9 +35,9 @@ jobs:
       - name: Verify integration bundle exports CardPaddleOCR
         working-directory: paddle-integration
         run: |
-          test -s dist/paddle-ocr.js
-          grep -q "CardPaddleOCR" dist/paddle-ocr.js
-          grep -q "cardpaddle-ready" dist/paddle-ocr.js
+          test -s dist/paddle-entry-513.js
+          grep -q "CardPaddleOCR" dist/paddle-entry-513.js
+          grep -q "cardpaddle-ready" dist/paddle-entry-513.js
           echo "Verified Paddle integration export and ready event"
 
       - name: Commit built bundle
