@@ -518,10 +518,13 @@
       } catch (paddleErr) {
         if (paddleErr?.name === 'AbortError') throw paddleErr;
         console.warn('PaddleOCR fallback to Tesseract:', paddleErr);
+        const paddleMsg = paddleErr?.message || String(paddleErr || '未知錯誤');
+        try { sessionStorage.setItem('cardkeeperPaddleLastError', paddleMsg); } catch (_) {}
+        showToast('PaddleOCR：' + paddleMsg);
         try { CardPaddleOCR?.reset?.().catch(() => {}); } catch (_) {}
         assertProcessing(runId);
         el('processingLabel').textContent = 'PaddleOCR 未完成，改用備援辨識…';
-        el('processingSub').textContent = 'Tesseract 備援模式';
+        el('processingSub').textContent = 'Paddle錯誤：' + paddleMsg;
         try {
           ocrResult = await withTimeout(CardOCR.recognize(workingImage, (m) => {
             if (runId !== processingRunId) return;
