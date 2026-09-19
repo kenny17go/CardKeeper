@@ -740,3 +740,12 @@ body{background:var(--ios-bg);}
 .ai-save-actions button{border:1px solid #e3c99e;background:#fffaf1;color:#7a5425;border-radius:9px;padding:7px 5px;font-size:10px;font-weight:700}
 .ai-save-actions button.active{background:#8a5a20;color:#fff;border-color:#8a5a20}
 @media(max-width:420px){.ai-save-actions{grid-template-columns:1fr}.ai-save-actions button{font-size:11px}}
+
+/* ===== 5.3.2 search → multi-select → custom category ===== */
+.batch-tag-bar{display:flex;align-items:center;gap:7px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:none}
+.batch-tag-bar::-webkit-scrollbar{display:none}.batch-tag-bar span{font-size:12px;color:#667085;white-space:nowrap;margin-right:auto}
+.batch-tag-bar button{flex:none;border:0;border-radius:999px;padding:7px 10px;background:#fff;color:var(--ios-blue);font-size:12px;font-weight:700}
+.batch-tag-bar #btnBatchTag{background:var(--ios-blue);color:#fff}.card-item.batch-selectable{position:relative;cursor:pointer}
+.batch-check{position:absolute;z-index:3;right:10px;top:10px;width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#fff;border:2px solid #c7c7cc;color:#fff;font-weight:800}
+.card-item.batch-selected{box-shadow:0 0 0 2px var(--ios-blue),0 4px 14px rgba(0,122,255,.12)}
+.card-item.batch-selected .batch-check{background:var(--ios-blue);border-color:var(--ios-blue)}
