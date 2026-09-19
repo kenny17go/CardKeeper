@@ -67,6 +67,31 @@
     stopLiveEdges?.();
   }
 
+  function resetProcessingState() {
+    captureInProgress = false;
+    liveEdgeBusy = false;
+    stableSince = 0;
+    lastLiveCorners = null;
+    autoCaptureCooldownUntil = 0;
+  }
+
+  function resetScanSession() {
+    pendingCapture = null;
+    editingCardId = null;
+    scanningBack = false;
+    pendingDuplicate = null;
+    processingCancelled = true;
+    processingRunId++;
+    resetProcessingState();
+    el('duplicateSheet')?.classList.add('hidden');
+  }
+
+  async function beginNewScan() {
+    resetScanSession();
+    processingCancelled = false;
+    await openCamera();
+  }
+
   function escapeHtml(s) {
     return (s || '').replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -170,8 +195,8 @@
   // ===================================================
   // Camera flow
   // ===================================================
-  el('btnCapture').addEventListener('click', openCamera);
-  el('btnCloseCamera').addEventListener('click', () => { stopLiveEdges(); CardCamera.stop(); closeAllScreens(); });
+  el('btnCapture').addEventListener('click', beginNewScan);
+  el('btnCloseCamera').addEventListener('click', () => { resetScanSession(); stopLiveEdges(); CardCamera.stop(); closeAllScreens(); });
 
   el('btnCancelProcessing')?.addEventListener('click', async () => {
     processingCancelled = true; processingRunId++;
@@ -562,7 +587,7 @@
   }
 
   el('btnConfirmBack').addEventListener('click', () => {
-    editingCardId = null;
+    resetScanSession();
     closeAllScreens();
   });
 
@@ -623,7 +648,7 @@
   function showDuplicateSheet(newCard,dup){pendingDuplicate={newCard,dup};el('duplicateReason').textContent=`相似度 ${dup.score}% · ${dup.reasons.join('、')}`;el('duplicateCompare').innerHTML=`<div><strong>${escapeHtml(dup.card.name||dup.card.company||'既有名片')}</strong><span>既有</span></div><div><strong>${escapeHtml(newCard.name||newCard.company||'新掃描')}</strong><span>新掃描</span></div>`;el('duplicateSheet').classList.remove('hidden');}
   el('btnCancelDuplicate')?.addEventListener('click',()=>{pendingDuplicate=null;el('duplicateSheet').classList.add('hidden')});
   el('btnKeepDuplicate')?.addEventListener('click',async()=>{const x=pendingDuplicate;if(!x)return;el('duplicateSheet').classList.add('hidden');pendingDuplicate=null;await persistCard(x.newCard,false);});
-  el('btnMergeDuplicate')?.addEventListener('click',async()=>{const x=pendingDuplicate;if(!x)return;const merged=mergeCards(x.dup.card,x.newCard);el('duplicateSheet').classList.add('hidden');pendingDuplicate=null;const storedMerged=await prepareCardForStorage(merged);await CardDB.put(storedMerged);pendingCapture=null;editingCardId=null;await loadCards();showToast('已智慧合併重複名片');if(captureMode==='continuous'){batchSaved++;el('batchCount').textContent=`${batchSaved} 張`;await openCamera();}else openDetail(storedMerged.id);});
+  el('btnMergeDuplicate')?.addEventListener('click',async()=>{const x=pendingDuplicate;if(!x)return;const merged=mergeCards(x.dup.card,x.newCard);el('duplicateSheet').classList.add('hidden');pendingDuplicate=null;const storedMerged=await prepareCardForStorage(merged);await CardDB.put(storedMerged);pendingCapture=null;editingCardId=null;scanningBack=false;pendingDuplicate=null;resetProcessingState();await loadCards();showToast('已智慧合併重複名片');if(captureMode==='continuous'){batchSaved++;el('batchCount').textContent=`${batchSaved} 張`;processingCancelled=false;await openCamera();}else openDetail(storedMerged.id);});
 
   async function prepareCardForStorage(card) {
     const stored = { ...card };
@@ -653,8 +678,8 @@
   async function persistCard(card, keepScanning){
     const wasEditing=!!editingCardId;
     const storedCard = pendingCapture ? await prepareCardForStorage(card) : card;
-    await CardDB.put(storedCard); pendingCapture=null; editingCardId=null; await loadCards();
-    if(keepScanning||captureMode==='continuous'){batchSaved++;el('batchCount').textContent=`${batchSaved} 張`;showToast(`已儲存第 ${batchSaved} 張`);await openCamera();return;}
+    await CardDB.put(storedCard); pendingCapture=null; editingCardId=null; scanningBack=false; pendingDuplicate=null; resetProcessingState(); await loadCards();
+    if(keepScanning||captureMode==='continuous'){batchSaved++;el('batchCount').textContent=`${batchSaved} 張`;showToast(`已儲存第 ${batchSaved} 張`);processingCancelled=false;await openCamera();return;}
     showToast(wasEditing?'已更新名片':'已儲存名片');openDetail(storedCard.id);
   }
   el('btnSaveNext')?.addEventListener('click',()=>{el('btnSaveCard').click();});
