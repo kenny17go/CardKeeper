@@ -11,6 +11,7 @@
   let photos = [];
   let results = [];
   let batchSource = '';
+  let reviewFilter = 'all';
 
   const uid = () => 'c_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
   const norm = v => String(v || '').toLowerCase().replace(/[\s()\-+.]/g, '');
@@ -192,9 +193,26 @@
       <div class="ai-company-chips">${companyText}</div>`;
   }
 
+  function needsReview(r) {
+    const vals = Object.values(r.fieldConfidence || {}).map(Number).filter(Number.isFinite);
+    return !r.reviewed && (
+      !!r.duplicateStatus ||
+      (r.confidence && r.confidence < 70) ||
+      vals.some(v => v < 65)
+    );
+  }
+
+  function resultPassesFilter(r) {
+    if (reviewFilter === 'review') return needsReview(r);
+    if (reviewFilter === 'duplicate') return !!r.duplicateStatus;
+    if (reviewFilter === 'confirmed') return !!r.reviewed;
+    return true;
+  }
+
   function groupedResults() {
     const groups = new Map();
     results.forEach((r, i) => {
+      if (!resultPassesFilter(r)) return;
       const key = (r.company || '未辨識公司').trim();
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push({r, i});
@@ -240,6 +258,27 @@
     $('aiBatchResultCount').textContent = results.length;
     compareWithExisting();
     renderBatchSummary();
+    const counts = {
+      all: results.length,
+      review: results.filter(needsReview).length,
+      duplicate: results.filter(r => r.duplicateStatus).length,
+      confirmed: results.filter(r => r.reviewed).length
+    };
+    let filters = $('aiBatchFilters');
+    if (!filters) {
+      filters = document.createElement('div');
+      filters.id = 'aiBatchFilters';
+      filters.className = 'ai-batch-filters';
+      $('aiBatchResultList').insertAdjacentElement('beforebegin', filters);
+    }
+    filters.innerHTML = [
+      ['all','全部'],['review','需確認'],['duplicate','重複/更新'],['confirmed','已確認']
+    ].map(([key,label]) => `<button type="button" data-filter="${key}" class="${reviewFilter===key?'active':''}">${label}<span>${counts[key]}</span></button>`).join('');
+    filters.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
+      reviewFilter = btn.dataset.filter;
+      renderResults();
+    }));
+
     $('aiBatchResultList').innerHTML = groupedResults().map(([company, items]) => `
       <section class="ai-company-group">
         <div class="ai-company-head"><strong>${esc(company)}</strong><span>${items.length} 張</span></div>
@@ -272,6 +311,9 @@
           </article>`;
         }).join('')}
       </section>`).join('');
+    if (!$('aiBatchResultList').innerHTML) {
+      $('aiBatchResultList').innerHTML = '<p class="ai-filter-empty">這個分類目前沒有名片。</p>';
+    }
 
     $('aiBatchResultList').querySelectorAll('.ai-result-card').forEach(card => {
       const i = Number(card.dataset.i);
