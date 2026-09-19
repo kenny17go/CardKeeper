@@ -1,5 +1,5 @@
 /* CardKeeper v5 Stable service worker */
-const CACHE_NAME = 'cardkeeper-shell-paddle-5.1.0';
+const CACHE_NAME = 'cardkeeper-shell-paddle-5.1.1';
 const SHELL_FILES = [
   './','./index.html','./css/style.css','./js/db.js','./js/parse.js',
   './js/vision.js','./js/ocr.js','./paddle-integration/dist/paddle-ocr.js','./js/vcard.js','./js/camera.js','./js/app.js',
