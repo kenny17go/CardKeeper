@@ -6,27 +6,43 @@ const CardOCR = (() => {
   let worker = null;
 
   let workerReady = null; // guards concurrent getWorker() calls from racing createWorker twice
+  let workerGeneration = 0; // invalidates workers that finish initializing after cancel/reset
 
   async function getWorker(onProgress) {
     if (worker) return worker;
     if (!workerReady) {
+      const myGeneration = workerGeneration;
       workerReady = (async () => {
         const w = await Tesseract.createWorker(['chi_tra', 'eng'], 1, {
           logger: (m) => onProgress && m.status && onProgress(m)
         });
-        await w.setParameters({
-          tessedit_pageseg_mode: '11',
-          preserve_interword_spaces: '1',
-          user_defined_dpi: '300'
-        });
-        worker = w;
-        return w;
+        try {
+          await w.setParameters({
+            tessedit_pageseg_mode: '11',
+            preserve_interword_spaces: '1',
+            user_defined_dpi: '300'
+          });
+          // A reset may have happened while createWorker() was still loading
+          // language/WASM assets. Never allow that stale worker to become active.
+          if (myGeneration !== workerGeneration) {
+            try { await w.terminate(); } catch (_) {}
+            throw new DOMException('OCR worker superseded by reset', 'AbortError');
+          }
+          worker = w;
+          return w;
+        } catch (err) {
+          if (worker !== w) {
+            try { await w.terminate(); } catch (_) {}
+          }
+          throw err;
+        }
       })();
     }
+    const ready = workerReady;
     try {
-      return await workerReady;
+      return await ready;
     } finally {
-      workerReady = null;
+      if (workerReady === ready) workerReady = null;
     }
   }
 
@@ -35,11 +51,27 @@ const CardOCR = (() => {
   // one at a time, so an abandoned-but-still-running job would otherwise sit
   // in the queue forever and silently freeze every future scan.
   async function reset() {
+    workerGeneration++;
     const w = worker;
+    const pending = workerReady;
     worker = null;
     workerReady = null;
+
     if (w) {
       try { await w.terminate(); } catch (_) { /* already dead, ignore */ }
+    }
+
+    // If initialization was still pending, its generation check will terminate
+    // the stale worker as soon as creation finishes. Awaiting it here is safe
+    // for callers that choose to await reset(), while fire-and-forget callers
+    // still immediately invalidate it via workerGeneration above.
+    if (pending) {
+      try {
+        const pendingWorker = await pending;
+        if (pendingWorker && pendingWorker !== w) {
+          try { await pendingWorker.terminate(); } catch (_) {}
+        }
+      } catch (_) { /* stale/failed initialization is expected after reset */ }
     }
   }
 

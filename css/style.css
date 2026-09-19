@@ -656,3 +656,9 @@ body{background:var(--ios-bg);}
 .processing-cancel{min-width:220px;min-height:44px;touch-action:manipulation;pointer-events:auto}
 #btnSkipProcessing{min-height:40px;pointer-events:auto;touch-action:manipulation}
 #screenProcessing{overflow:auto;-webkit-overflow-scrolling:touch}
+
+
+/* ===== v5 Stable build label ===== */
+.home-title-meta{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.home-title-meta .eyebrow{margin:0!important}
+.app-version{display:inline-flex;align-items:center;min-height:20px;padding:3px 7px;border-radius:999px;background:#e8f2ff;color:var(--ios-blue);font-size:10px;font-weight:700;letter-spacing:.02em;line-height:1}
