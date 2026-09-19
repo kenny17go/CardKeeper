@@ -716,3 +716,15 @@ body{background:var(--ios-bg);}
 .ai-company-head strong{font-size:14px}
 .ai-company-head span{font-size:11px;color:#7b8490}
 @media(max-width:420px){.ai-summary-metrics{grid-template-columns:repeat(2,1fr)}}
+
+.ai-result-edit{margin-top:5px;align-self:flex-start;border:1px solid #c9d7f5;background:#f4f7ff;color:#2563c9;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:700}
+.ai-edit-overlay{position:fixed;inset:0;z-index:9999;background:rgba(16,24,40,.38);display:flex;align-items:flex-end;justify-content:center}
+.ai-edit-sheet{width:min(100%,560px);max-height:88dvh;overflow:auto;background:#f8f9fb;border-radius:22px 22px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -12px 40px rgba(0,0,0,.16)}
+.ai-edit-head{display:flex;align-items:center;justify-content:space-between;position:sticky;top:-18px;background:#f8f9fb;padding:4px 0 12px;z-index:2}
+.ai-edit-head strong{font-size:20px}.ai-edit-close{border:0;background:#e9ecf1;border-radius:50%;width:34px;height:34px;font-size:22px}
+.ai-edit-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ai-edit-fields label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:#667085;font-weight:600}
+.ai-edit-fields input,.ai-edit-fields textarea{width:100%;border:1px solid #d7dce4;border-radius:10px;background:#fff;padding:10px;font:inherit;font-size:14px;color:#172033}
+.ai-edit-fields label:has(textarea){grid-column:1/-1}
+.ai-edit-save{width:100%;margin-top:14px;border:0;border-radius:12px;padding:13px;background:#3478f6;color:#fff;font-size:15px;font-weight:800}
+@media(max-width:420px){.ai-edit-fields{grid-template-columns:1fr}}
