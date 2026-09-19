@@ -89,3 +89,4 @@ async function reset() {
 }
 
 window.CardPaddleOCR = { recognize, reset, preload: getEngine };
+window.dispatchEvent(new Event('cardpaddle-ready'));
