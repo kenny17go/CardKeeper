@@ -504,7 +504,17 @@
 
       let ocrResult;
       try {
-        if (!window.CardPaddleOCR?.recognize) throw new Error('PaddleOCR module unavailable');
+        if (!window.CardPaddleOCR?.recognize) {
+          await new Promise((resolve, reject) => {
+            if (window.CardPaddleOCR?.recognize) return resolve();
+            const done = () => { clearTimeout(timer); resolve(); };
+            const timer = setTimeout(() => {
+              window.removeEventListener('cardpaddle-ready', done);
+              reject(new Error('PaddleOCR module unavailable'));
+            }, 8000);
+            window.addEventListener('cardpaddle-ready', done, { once: true });
+          });
+        }
         ocrResult = await withTimeout(CardPaddleOCR.recognize(workingImage, (m) => {
           if (runId !== processingRunId) return;
           if (m.status === 'paddle-loading') {
