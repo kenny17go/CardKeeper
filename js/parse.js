@@ -16,8 +16,12 @@ const CardParse = (() => {
     {cat:'法律/顧問',kws:['律師','事務所','會計師','顧問','Law','Legal','Consulting']}
   ];
 
+  const NAME_EXCLUDE=['行銷','機構','金融','業務','管理','服務','部','處','科','課','組','中心','銀行','公司','股份','有限公司'];
+
   const clean = s => (s || '')
     .replace(/\u3000/g,' ')
+    .replace(/協埋/g,'協理')
+    .replace(/總緩/g,'總機')
     .replace(/[＠﹫]/g,'@')
     .replace(/[：﹕]/g,':')
     .replace(/[，]/g,',')
@@ -64,28 +68,28 @@ const CardParse = (() => {
     const out=[]; const seen=new Set();
     const re=/(?:\+?886[-\s]?)?(?:\(?0?9\d{2}\)?[-\s]?\d{3}[-\s]?\d{3}|\(?0\d{1,2}\)?[-\s]?\d{3,4}[-\s]?\d{4})(?:\s*(?:ext\.?|x|#|分機)\s*\d{1,6})?/gi;
 
-    for(const original of lines(t)){
-      const line=phoneReadyLine(original);
-      const label=/fax|傳真|(?:^|\s)f\s*[:：]/i.test(line)?'fax':
-        /mobile|cell|手機|行動|(?:^|\s)m\s*[:：]/i.test(line)?'mobile':
-        /tel|phone|電話|(?:^|\s)t\s*[:：]/i.test(line)?'phone':'';
-
-      for(const m of line.match(re)||[]){
-        const key=digits(m);
-        if(key.replace(/\D/g,'').length < 8 || seen.has(key)) continue;
-        seen.add(key);
-        const mobile=/^(?:\+?886)?0?9\d{8}$/.test(key.replace(/[-\s()]/g,''));
-        out.push({value:clean(m),type:label||(mobile?'mobile':'phone'),source:original});
-      }
+    function classify(line, matchIndex, value) {
+      const before=line.slice(Math.max(0,matchIndex-12),matchIndex).toLowerCase();
+      const local=line.slice(Math.max(0,matchIndex-8),Math.min(line.length,matchIndex+value.length+8)).toLowerCase();
+      const key=digits(value).replace(/\D/g,'');
+      if(/fax|傳真|(?:^|\s)f\s*[:：]?/i.test(before) || /fax|傳真/i.test(local)) return 'fax';
+      if(/mobile|cell|手機|行動|(?:^|\s)m\s*[:：]?/i.test(before)) return 'mobile';
+      if(/專線|direct/i.test(before)) return 'phone';
+      if(/tel|phone|電話|總機|(?:^|\s)t\s*[:：]?/i.test(before)) return 'phone';
+      return /^(?:886)?9\d{8}$/.test(key.replace(/^0/,'')) || /^09\d{8}$/.test(key) ? 'mobile' : 'phone';
     }
 
-    const whole=phoneReadyLine(t);
-    for(const m of whole.match(re)||[]){
-      const key=digits(m);
-      if(key.replace(/\D/g,'').length < 8 || seen.has(key)) continue;
-      seen.add(key);
-      const mobile=/^(?:\+?886)?0?9\d{8}$/.test(key.replace(/[-\s()]/g,''));
-      out.push({value:clean(m),type:mobile?'mobile':'phone',source:''});
+    for(const original of lines(t)){
+      const line=phoneReadyLine(original);
+      re.lastIndex=0;
+      let m;
+      while((m=re.exec(line))){
+        const value=clean(m[0]);
+        const key=digits(value);
+        if(key.replace(/\D/g,'').length < 8 || seen.has(key)) continue;
+        seen.add(key);
+        out.push({value,type:classify(line,m.index,value),source:original,index:m.index});
+      }
     }
     return out;
   }
@@ -124,16 +128,26 @@ const CardParse = (() => {
 
     const companyCandidates=ls
       .filter(l=>!used.has(l))
-      .map(l=>({raw:l,value:stripFieldLabel(l)}))
-      .sort((a,b)=>score(b.value,COMPANY_KEYWORDS)-score(a.value,COMPANY_KEYWORDS));
+      .map((l,i)=>({raw:l,index:i,value:stripFieldLabel(l)}))
+      .map(x=>{
+        const hit=COMPANY_KEYWORDS.find(k=>x.value.toLowerCase().includes(k.toLowerCase()));
+        if(hit){
+          const pos=x.value.toLowerCase().indexOf(hit.toLowerCase());
+          const prefix=x.value.slice(0,pos);
+          if(prefix.length>0 && prefix.length<=5 && !/[\u3400-\u9fff]{2,}/.test(prefix)) x.value=x.value.slice(pos);
+        }
+        x.value=x.value.replace(/\s+[A-Za-z]{1,3}$/,'').trim();
+        return x;
+      })
+      .sort((a,b)=>(score(b.value,COMPANY_KEYWORDS)-b.index*.03)-(score(a.value,COMPANY_KEYWORDS)-a.index*.03));
     const companyTop=companyCandidates[0];
     const companyOk=companyTop&&score(companyTop.value,COMPANY_KEYWORDS)>2.5?companyTop.value:'';
     if(companyOk)used.add(companyTop.raw);
 
     const titleCandidates=ls
       .filter(l=>!used.has(l))
-      .map(l=>({raw:l,value:stripFieldLabel(l)}))
-      .sort((a,b)=>score(b.value,TITLE_KEYWORDS)-score(a.value,TITLE_KEYWORDS));
+      .map((l,i)=>({raw:l,index:i,value:stripFieldLabel(l)}))
+      .sort((a,b)=>(score(b.value,TITLE_KEYWORDS)-b.index*.02)-(score(a.value,TITLE_KEYWORDS)-a.index*.02));
     const titleTop=titleCandidates[0];
     const titleOk=titleTop&&score(titleTop.value,TITLE_KEYWORDS)>2.5?titleTop.value:'';
     if(titleOk)used.add(titleTop.raw);
@@ -145,19 +159,33 @@ const CardParse = (() => {
       return /^(?:地址|address)\s*[:：]?/i.test(l) ? hits>=1 : hits>=2;
     })||'';
     if(addrRaw)used.add(addrRaw);
-    const addr=addrRaw.replace(/^(地址|address)\s*[:：]?\s*/i,'').trim();
+    const addr=addrRaw.replace(/^(地址|address)\s*[:：]?\s*/i,'').replace(/\s*(?:統編|統一編號)\s*[:：]?\s*\d{8}.*$/i,'').replace(/[ _-]+$/,'').trim();
 
     let name='';
     let nameEn='';
 
+    const nameCandidates=ls
+      .map((l,i)=>({raw:l,index:i,value:stripFieldLabel(l)}))
+      .filter(x=>!used.has(x.raw) && chineseName(x.value))
+      .filter(x=>!NAME_EXCLUDE.some(k=>x.value.includes(k)))
+      .map(x=>{
+        let n=0;
+        if(x.value.length===3) n+=8;
+        else if(x.value.length===2 || x.value.length===4) n+=5;
+        else n+=1;
+        n+=Math.max(0,5-x.index*.35);
+        if(TITLE_KEYWORDS.some(k=>x.value.includes(k))) n-=8;
+        return {...x,nameScore:n};
+      })
+      .sort((a,b)=>b.nameScore-a.nameScore);
+    if(nameCandidates[0]){
+      name=nameCandidates[0].value;
+      used.add(nameCandidates[0].raw);
+    }
+
     for(const l of ls){
       if(used.has(l)) continue;
       const candidate=stripFieldLabel(l);
-      if(!name && chineseName(candidate)){
-        name=candidate;
-        used.add(l);
-        continue;
-      }
       if(!nameEn && englishName(candidate) && !COMPANY_KEYWORDS.some(k=>candidate.toLowerCase().includes(k.toLowerCase()))){
         nameEn=candidate;
       }
@@ -166,6 +194,7 @@ const CardParse = (() => {
     const mobiles=ps.filter(p=>p.type==='mobile');
     const faxes=ps.filter(p=>p.type==='fax');
     const phones=ps.filter(p=>p.type==='phone');
+    phones.sort((a,b)=>(/專線|direct/i.test(b.source)?3:0)-(/專線|direct/i.test(a.source)?3:0));
 
     return {
       name,
