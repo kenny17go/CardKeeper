@@ -133,6 +133,24 @@
     return out;
   }
 
+  function autoCategoryForImportedCard(obj) {
+    const explicit = String(obj['分類'] || obj['Category'] || obj['category'] || '').trim();
+    if (explicit && explicit !== '未分類') return explicit;
+    const text = [
+      obj['公司'], obj['Company'], obj['company'],
+      obj['職稱'], obj['Title'], obj['title'],
+      obj['部門'], obj['Department'], obj['department'],
+      obj['網站'], obj['Website'], obj['website'],
+      obj['地址'], obj['Address'], obj['address'],
+      obj['備註'], obj['Note'], obj['note']
+    ].filter(Boolean).join('\n');
+    try {
+      const parsed = window.CardParse?.parse?.(text);
+      if (parsed?.category && parsed.category !== '未分類') return parsed.category;
+    } catch (_) {}
+    return '未分類';
+  }
+
   function csvRowToResult(obj, index) {
     const phones = splitPhoneField(obj['電話'] || obj['Phone'] || obj['phone'] || '');
     const extras = [];
@@ -160,7 +178,7 @@
       companyAddress: obj['公司地址'] || obj['companyAddress'] || '',
       postalCode: obj['郵遞區號'] || obj['postalCode'] || '',
       country: obj['國家'] || obj['國家/地區'] || obj['country'] || '',
-      category: obj['分類'] || obj['Category'] || obj['category'] || '未分類',
+      category: autoCategoryForImportedCard(obj),
       note,
       importedCreatedAt: obj['建立日期'] || obj['Created At'] || obj['createdAt'] || '',
       rawText: Object.entries(obj).filter(([,v]) => v).map(([k,v]) => k + '：' + v).join('\n'),
