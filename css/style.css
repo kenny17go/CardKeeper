@@ -735,3 +735,8 @@ body{background:var(--ios-bg);}
 .ai-batch-filters button.active{background:#3478f6;color:#fff;border-color:#3478f6}
 .ai-batch-filters button span{margin-left:4px;opacity:.72}
 .ai-filter-empty{text-align:center;color:#7b8490;padding:26px 8px;font-size:13px}
+
+.ai-save-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px}
+.ai-save-actions button{border:1px solid #e3c99e;background:#fffaf1;color:#7a5425;border-radius:9px;padding:7px 5px;font-size:10px;font-weight:700}
+.ai-save-actions button.active{background:#8a5a20;color:#fff;border-color:#8a5a20}
+@media(max-width:420px){.ai-save-actions{grid-template-columns:1fr}.ai-save-actions button{font-size:11px}}
