@@ -37,6 +37,7 @@
   const screenConfirm = el('screenConfirm');
   const screenDetail = el('screenDetail');
   const screenBackup = el('screenBackup');
+  const screenAiBatch = el('screenAiBatch');
 
   const video = el('video');
   const captureCanvas = el('captureCanvas');
@@ -57,7 +58,7 @@
   }
 
   function showScreen(screenEl) {
-    [screenCamera, screenProcessing, screenConfirm, screenDetail, screenBackup].forEach(s => s.classList.add('hidden'));
+    [screenCamera, screenProcessing, screenConfirm, screenDetail, screenBackup, screenAiBatch].forEach(s => s.classList.add('hidden'));
     if (screenEl) screenEl.classList.remove('hidden');
   }
 
