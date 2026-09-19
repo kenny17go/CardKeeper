@@ -70,9 +70,10 @@ const CardParse = (() => {
 
     function classify(line, matchIndex, value) {
       const before=line.slice(Math.max(0,matchIndex-12),matchIndex).toLowerCase();
-      const local=line.slice(Math.max(0,matchIndex-8),Math.min(line.length,matchIndex+value.length+8)).toLowerCase();
       const key=digits(value).replace(/\D/g,'');
-      if(/fax|傳真|(?:^|\s)f\s*[:：]?/i.test(before) || /fax|傳真/i.test(local)) return 'fax';
+      // Classify by the label BEFORE this specific number. Looking after the
+      // match can steal the next label on lines such as 總機... 傳真...
+      if(/fax|傳真|(?:^|\s)f\s*[:：]?/i.test(before)) return 'fax';
       if(/mobile|cell|手機|行動|(?:^|\s)m\s*[:：]?/i.test(before)) return 'mobile';
       if(/專線|direct/i.test(before)) return 'phone';
       if(/tel|phone|電話|總機|(?:^|\s)t\s*[:：]?/i.test(before)) return 'phone';
