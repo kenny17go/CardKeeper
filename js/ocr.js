@@ -89,9 +89,9 @@ const CardOCR = (() => {
 
   async function makeVariants(dataUrl) {
     const img = await loadImage(dataUrl);
-    const minTarget = 1800;
-    const maxTarget = 2400;
-    const upscaled = Math.min(img.naturalWidth * 2, Math.max(minTarget, img.naturalWidth));
+    const minTarget = 2100;
+    const maxTarget = 2800;
+    const upscaled = Math.min(img.naturalWidth * 2.25, Math.max(minTarget, img.naturalWidth));
     const targetW = Math.max(1, Math.min(maxTarget, Math.round(upscaled)));
     const scale = targetW / img.naturalWidth;
     const w = Math.max(1, Math.round(img.naturalWidth * scale));
