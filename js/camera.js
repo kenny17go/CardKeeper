@@ -51,7 +51,8 @@ const CardCamera = (() => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
-        const scale = Math.min(1, maxWidth / img.naturalWidth);
+        const longestSide = Math.max(img.naturalWidth, img.naturalHeight);
+        const scale = Math.min(1, maxWidth / longestSide);
         const w = Math.max(1, Math.round(img.naturalWidth * scale));
         const h = Math.max(1, Math.round(img.naturalHeight * scale));
         const canvas = document.createElement('canvas');
