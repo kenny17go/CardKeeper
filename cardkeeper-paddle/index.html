@@ -289,11 +289,11 @@
 <script src="js/ocr.js"></script>
 <script src="js/vcard.js"></script>
 <script src="js/camera.js"></script>
+<script src="js/app.js"></script>
 <script type="module">
-  import "./paddle-integration/dist/paddle-ocr.js";
-  const s = document.createElement("script");
-  s.src = "js/app.js";
-  document.body.appendChild(s);
+  import("./paddle-integration/dist/paddle-ocr.js").catch(err => {
+    console.warn("PaddleOCR preload failed:", err);
+  });
 </script>
 </body>
 </html>
