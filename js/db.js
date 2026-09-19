@@ -4,7 +4,7 @@
    ========================================================= */
 const CardDB = (() => {
   const DB_NAME = 'cardkeeper-db';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const STORE = 'cards';
   let dbPromise = null;
 
@@ -17,7 +17,12 @@ const CardDB = (() => {
         if (!db.objectStoreNames.contains(STORE)) {
           const store = db.createObjectStore(STORE, { keyPath: 'id' });
           store.createIndex('updatedAt', 'updatedAt');
+          store.createIndex('createdAt', 'createdAt');
         }
+        // v2 is intentionally non-destructive: existing cards remain valid.
+        // New fields (backPhoto, phone2, fax, OCR metadata) are optional.
+        const store = req.transaction.objectStore(STORE);
+        if (!store.indexNames.contains('createdAt')) store.createIndex('createdAt', 'createdAt');
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
