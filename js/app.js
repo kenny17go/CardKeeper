@@ -504,26 +504,55 @@
 
       let ocrResult;
       try {
-        ocrResult = await withTimeout(CardOCR.recognize(workingImage, (m) => {
+        if (!window.CardPaddleOCR?.recognize) {
+          await new Promise((resolve, reject) => {
+            if (window.CardPaddleOCR?.recognize) return resolve();
+            const done = () => { clearTimeout(timer); resolve(); };
+            const timer = setTimeout(() => {
+              window.removeEventListener('cardpaddle-ready', done);
+              reject(new Error('PaddleOCR module unavailable: ' + (window.__paddleLoadError?.message || 'timeout')));
+            }, 20000);
+            window.addEventListener('cardpaddle-ready', done, { once: true });
+          });
+        }
+        ocrResult = await withTimeout(CardPaddleOCR.recognize(workingImage, (m) => {
           if (runId !== processingRunId) return;
-          if (m.status === 'ocr-pass') {
-            el('processingLabel').textContent = `OCR 第 ${m.pass}/${m.total} 輪…`;
-            el('processingSub').textContent = '比對不同影像強化策略';
-          } else if (m.status === 'recognizing text') {
-            el('processingLabel').textContent = `辨識文字… ${Math.round((m.progress || 0) * 100)}%`;
+          if (m.status === 'paddle-loading') {
+            el('processingLabel').textContent = '正在準備 PaddleOCR…';
+            el('processingSub').textContent = '第一次使用會載入模型';
+          } else if (m.status === 'paddle-recognizing') {
+            el('processingLabel').textContent = 'PaddleOCR 辨識文字…';
+            el('processingSub').textContent = '720px 快速辨識';
           }
-        }), 22000, 'OCR');
-      } catch (ocrErr) {
-        if (ocrErr?.name === 'AbortError') throw ocrErr;
-        console.warn('OCR fallback:', ocrErr);
-        // The recognize() call that just timed out may still be running inside
-        // the Tesseract worker (withTimeout only abandons our wait for it).
-        // Terminate it now so it doesn't block every subsequent scan's OCR call.
-        CardOCR.reset().catch(() => {});
+        }), 32000, 'PaddleOCR');
+      } catch (paddleErr) {
+        if (paddleErr?.name === 'AbortError') throw paddleErr;
+        console.warn('PaddleOCR fallback to Tesseract:', paddleErr);
+        const paddleMsg = paddleErr?.message || String(paddleErr || '未知錯誤');
+        try { sessionStorage.setItem('cardkeeperPaddleLastError', paddleMsg); } catch (_) {}
+        showToast('PaddleOCR：' + paddleMsg);
+        try { CardPaddleOCR?.reset?.().catch(() => {}); } catch (_) {}
         assertProcessing(runId);
-        showToast('OCR 未完成，已改為手動確認');
-        await openManualConfirmFromImage(workingImage, imageDataUrl, visionMeta);
+        el('processingLabel').textContent = 'PaddleOCR 錯誤';
+        el('processingSub').textContent = paddleMsg;
+        // Test build: stop here so the real Paddle error remains visible.
+        // Do not immediately overwrite it with Tesseract progress.
         return;
+        try {
+          ocrResult = await withTimeout(CardOCR.recognize(workingImage, (m) => {
+            if (runId !== processingRunId) return;
+            if (m.status === 'ocr-pass') el('processingLabel').textContent = `備援 OCR 第 ${m.pass}/${m.total} 輪…`;
+            else if (m.status === 'recognizing text') el('processingLabel').textContent = `備援辨識… ${Math.round((m.progress || 0) * 100)}%`;
+          }), 22000, 'Tesseract OCR');
+        } catch (ocrErr) {
+          if (ocrErr?.name === 'AbortError') throw ocrErr;
+          console.warn('Tesseract fallback failed:', ocrErr);
+          CardOCR.reset().catch(() => {});
+          assertProcessing(runId);
+          showToast('OCR 未完成，已改為手動確認');
+          await openManualConfirmFromImage(workingImage, imageDataUrl, visionMeta);
+          return;
+        }
       }
 
       assertProcessing(runId);

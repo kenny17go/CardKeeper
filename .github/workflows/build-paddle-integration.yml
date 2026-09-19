@@ -1,0 +1,108 @@
+name: Build PaddleOCR integration
+
+on:
+  pull_request:
+    branches: [paddle-integration-test]
+  push:
+    branches: [paddle-integration-test]
+    paths:
+      - 'paddle-integration/**'
+      - 'index.html'
+      - 'css/**'
+      - 'js/**'
+      - 'manifest.json'
+      - 'sw.js'
+      - '.github/workflows/build-paddle-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        working-directory: paddle-integration
+        run: npm install
+      - name: Build browser bundle
+        working-directory: paddle-integration
+        run: npm run build
+      - name: Verify integration bundle exports CardPaddleOCR
+        working-directory: paddle-integration
+        run: |
+          test -s dist/paddle-entry-513.js
+          grep -q "CardPaddleOCR" dist/paddle-entry-513.js
+          grep -q "cardpaddle-ready" dist/paddle-entry-513.js
+          echo "Verified Paddle integration export and ready event"
+
+      - name: Commit built bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add paddle-integration/dist
+          if git diff --cached --quiet; then
+            echo "No build changes"
+          else
+            git commit -m "Build PaddleOCR integration bundle"
+            git push
+          fi
+
+      - name: Build AI debug ZIP
+        if: github.event_name == 'push'
+        run: |
+          rm -rf /tmp/CardKeeper-PaddleOCR-Debug
+          mkdir -p /tmp/CardKeeper-PaddleOCR-Debug/integration/paddle-integration
+          mkdir -p /tmp/CardKeeper-PaddleOCR-Debug/integration/js
+          mkdir -p /tmp/CardKeeper-PaddleOCR-Debug/integration/.github/workflows
+          mkdir -p /tmp/CardKeeper-PaddleOCR-Debug/working-v7/paddle-src
+          cp paddle-integration/paddle-entry.js paddle-integration/package.json paddle-integration/vite.config.js /tmp/CardKeeper-PaddleOCR-Debug/integration/paddle-integration/
+          cp js/app.js /tmp/CardKeeper-PaddleOCR-Debug/integration/js/
+          cp index.html sw.js /tmp/CardKeeper-PaddleOCR-Debug/integration/
+          cp .github/workflows/build-paddle-integration.yml /tmp/CardKeeper-PaddleOCR-Debug/integration/.github/workflows/
+          git fetch origin paddleocr-test
+          git show origin/paddleocr-test:paddle-src/main.js > /tmp/CardKeeper-PaddleOCR-Debug/working-v7/paddle-src/main.js
+          git show origin/paddleocr-test:paddle-src/index.html > /tmp/CardKeeper-PaddleOCR-Debug/working-v7/paddle-src/index.html
+          git show origin/paddleocr-test:paddle-src/package.json > /tmp/CardKeeper-PaddleOCR-Debug/working-v7/paddle-src/package.json
+          git show origin/paddleocr-test:paddle-src/vite.config.js > /tmp/CardKeeper-PaddleOCR-Debug/working-v7/paddle-src/vite.config.js
+          cat > /tmp/CardKeeper-PaddleOCR-Debug/README.txt <<'EOF'
+          CardKeeper PaddleOCR Debug Package
+          
+          working-v7/ = PaddleOCR v7 / 720px version that worked on the same iPhone Safari.
+          integration/ = CardKeeper integration version currently failing with "PaddleOCR module unavailable"; earlier attempts also showed "Load failed".
+          
+          Please compare Vite bundling, Worker/model/WASM asset URLs, GitHub Pages subfolder paths, ES module loading, Service Worker caching, and when window.CardPaddleOCR is created.
+          Goal: minimal fix; do not rewrite CardKeeper.
+          EOF
+          cd /tmp
+          zip -qr CardKeeper-PaddleOCR-Debug.zip CardKeeper-PaddleOCR-Debug
+
+      - name: Prepare isolated Pages preview
+        if: github.event_name == 'push'
+        run: |
+          rm -rf /tmp/cardkeeper-paddle
+          mkdir -p /tmp/cardkeeper-paddle
+          cp index.html manifest.json sw.js /tmp/cardkeeper-paddle/
+          cp -R css js icons /tmp/cardkeeper-paddle/
+          mkdir -p /tmp/cardkeeper-paddle/paddle-integration
+          cp -R paddle-integration/dist /tmp/cardkeeper-paddle/paddle-integration/
+      - name: Publish preview folder to paddleocr-test
+        if: github.event_name == 'push'
+        run: |
+          git fetch origin paddleocr-test
+          git checkout paddleocr-test
+          rm -rf cardkeeper-paddle
+          cp -R /tmp/cardkeeper-paddle ./cardkeeper-paddle
+          cp /tmp/CardKeeper-PaddleOCR-Debug.zip ./CardKeeper-PaddleOCR-Debug.zip
+          git add cardkeeper-paddle
+          git add CardKeeper-PaddleOCR-Debug.zip
+          if git diff --cached --quiet; then
+            echo "No preview changes"
+          else
+            git commit -m "Deploy CardKeeper PaddleOCR integration preview"
+            git push origin paddleocr-test
+          fi
