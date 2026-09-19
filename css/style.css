@@ -696,3 +696,9 @@ body{background:var(--ios-bg);}
 .ai-batch-test-tools summary{font-weight:700;cursor:pointer}
 .ai-batch-status{font-size:13px;color:var(--ink-soft);margin:10px 0}
 @media(max-width:380px){.ai-batch-actions{grid-template-columns:1fr}}
+
+.ai-batch-source{width:100%;border:1px solid #d9cfb4;border-radius:12px;padding:12px 14px;margin:0 0 14px;background:var(--card);color:var(--ink);font-size:14px}
+.ai-field-ok{color:#2f855a;font-weight:700}
+.ai-field-mid{color:#9a6700;font-weight:700;font-size:11px}
+.ai-field-low{color:#b42318;font-weight:700;font-size:11px}
+.ai-duplicate-note{margin-top:9px;padding:8px 10px;border-radius:9px;background:#fff4e5;color:#8a4b08;font-size:12px;font-weight:600}
