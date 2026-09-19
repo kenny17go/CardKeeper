@@ -1,5 +1,5 @@
 /* CardKeeper v5 Stable service worker */
-const CACHE_NAME = 'cardkeeper-shell-import-5.3.2';
+const CACHE_NAME = 'cardkeeper-shell-import-5.3.3';
 const SHELL_FILES = [
   './','./index.html','./css/style.css','./js/db.js','./js/parse.js',
   './js/vision.js','./js/ocr.js','./js/vcard.js','./js/camera.js','./js/ai-batch.js','./js/app.js',
