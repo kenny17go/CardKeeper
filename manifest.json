@@ -1,5 +1,5 @@
 {
-  "name": "名片管家 CardKeeper v5 Stable",
+  "name": "名片管家 CardKeeper v5.1 Clean",
   "short_name": "名片管家",
   "description": "穩定、離線優先的名片掃描與管理 PWA。",
   "start_url": "./index.html",
@@ -10,8 +10,8 @@
   "theme_color": "#232B38",
   "lang": "zh-Hant-TW",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icons/icon-192.png?v=510c", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png?v=510c", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png?v=510c", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

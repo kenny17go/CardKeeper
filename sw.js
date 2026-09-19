@@ -1,9 +1,9 @@
-/* CardKeeper v5 Stable service worker */
-const CACHE_NAME = 'cardkeeper-shell-v5.0.5';
+/* CardKeeper v5.1 Clean service worker */
+const CACHE_NAME = 'cardkeeper-shell-v5.1-clean.0';
 const SHELL_FILES = [
   './','./index.html','./css/style.css','./js/db.js','./js/parse.js',
   './js/vision.js','./js/ocr.js','./js/vcard.js','./js/camera.js','./js/app.js',
-  './manifest.json','./icons/icon-192.png','./icons/icon-512.png','./icons/apple-touch-icon.png'
+  './manifest.json','./icons/icon-192.png?v=510c','./icons/icon-512.png?v=510c','./icons/apple-touch-icon.png?v=510c'
 ];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(SHELL_FILES)).then(()=>self.skipWaiting()));
