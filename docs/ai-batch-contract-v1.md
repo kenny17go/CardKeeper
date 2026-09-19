@@ -111,3 +111,12 @@ Purpose: define a provider-neutral request/response format for AI batch business
 5. Highlight low-confidence or changed fields.
 6. Require user confirmation.
 7. Save only confirmed records.
+
+
+## Duplicate/update persistence policy
+When CardKeeper matches an AI result to an existing local card, the default action is **skip / keep existing data**. The user may explicitly choose:
+- **skip**: keep the existing card unchanged.
+- **merge**: fill only fields that are blank on the existing card; preserve existing non-empty values.
+- **replace**: update the existing record with non-empty values from the new card while preserving its ID, creation date, favorite state, back image, and other unrelated stored data.
+
+AI providers do not choose these actions. CardKeeper and the user own the decision.
