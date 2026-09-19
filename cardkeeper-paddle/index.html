@@ -292,6 +292,7 @@
 <script src="js/app.js"></script>
 <script type="module">
   import("./paddle-integration/dist/paddle-ocr.js").catch(err => {
+    window.__paddleLoadError = err;
     console.warn("PaddleOCR preload failed:", err);
   });
 </script>
