@@ -97,6 +97,102 @@
     });
   }
 
+  function parseCsv(text) {
+    text = String(text || '').replace(/^\uFEFF/, '');
+    const rows = []; let row = [], field = '', quoted = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (quoted) {
+        if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+        else if (ch === '"') quoted = false;
+        else field += ch;
+      } else if (ch === '"') quoted = true;
+      else if (ch === ',') { row.push(field); field = ''; }
+      else if (ch === '\n') { row.push(field.replace(/\r$/, '')); rows.push(row); row = []; field = ''; }
+      else field += ch;
+    }
+    if (field.length || row.length) { row.push(field.replace(/\r$/, '')); rows.push(row); }
+    return rows.filter(r => r.some(v => String(v).trim()));
+  }
+
+  function splitPhoneField(value) {
+    const out = { mobile:'', phone:'', phone2:'', extension:'', fax:'' };
+    const parts = String(value || '').split(/\s*\/\s*|[；;]/).map(v => v.trim()).filter(Boolean);
+    for (const raw of parts) {
+      const isFax = /fax|傳真/i.test(raw);
+      const ext = raw.match(/(?:#|ext\.?|分機)\s*(\d+)/i);
+      if (ext && !out.extension) out.extension = ext[1];
+      const clean = raw.replace(/\s*\((?:fax|傳真)\)\s*/ig,'').replace(/(?:fax|傳真)\s*:?/ig,'').replace(/(?:#|ext\.?|分機)\s*\d+/ig,'').trim();
+      if (!clean) continue;
+      if (isFax) { if (!out.fax) out.fax = clean; continue; }
+      if (/^(?:\+?886[- ]?)?0?9\d{2}[- ]?\d{3}[- ]?\d{3}$/.test(clean.replace(/\s/g,''))) {
+        if (!out.mobile) out.mobile = clean;
+      } else if (!out.phone) out.phone = clean;
+      else if (!out.phone2 && norm(clean) !== norm(out.phone)) out.phone2 = clean;
+    }
+    return out;
+  }
+
+  function csvRowToResult(obj, index) {
+    const phones = splitPhoneField(obj['電話'] || obj['Phone'] || obj['phone'] || '');
+    const extras = [];
+    const line = obj['LINE ID'] || obj['LINE'] || '';
+    const linkedin = obj['LinkedIn'] || obj['linkedin'] || '';
+    if (line) extras.push('LINE ID：' + line);
+    if (linkedin) extras.push('LinkedIn：' + linkedin);
+    const baseNote = obj['備註'] || obj['Note'] || obj['note'] || '';
+    const note = [baseNote, ...extras].filter(Boolean).join(' · ');
+    return normalizeResult({
+      name: obj['姓名'] || obj['Name'] || obj['name'] || '',
+      nameEn: obj['英文姓名'] || obj['English Name'] || obj['nameEn'] || '',
+      company: obj['公司'] || obj['Company'] || obj['company'] || '',
+      title: obj['職稱'] || obj['Title'] || obj['title'] || '',
+      department: obj['部門'] || obj['Department'] || obj['department'] || '',
+      taxId: obj['統編'] || obj['公司統編'] || obj['Tax ID'] || obj['taxId'] || '',
+      mobile: obj['手機'] || obj['Mobile'] || obj['mobile'] || phones.mobile,
+      phone: obj['公司電話'] || obj['Phone'] || obj['phone'] || phones.phone,
+      phone2: obj['其他電話'] || obj['第二電話'] || obj['phone2'] || phones.phone2,
+      extension: obj['分機'] || obj['Extension'] || obj['extension'] || phones.extension,
+      fax: obj['傳真'] || obj['Fax'] || obj['fax'] || phones.fax,
+      email: obj['Email'] || obj['email'] || '',
+      website: obj['網站'] || obj['Website'] || obj['website'] || '',
+      address: obj['地址'] || obj['Address'] || obj['address'] || '',
+      companyAddress: obj['公司地址'] || obj['companyAddress'] || '',
+      postalCode: obj['郵遞區號'] || obj['postalCode'] || '',
+      country: obj['國家'] || obj['國家/地區'] || obj['country'] || '',
+      category: obj['分類'] || obj['Category'] || obj['category'] || '未分類',
+      note,
+      importedCreatedAt: obj['建立日期'] || obj['Created At'] || obj['createdAt'] || '',
+      rawText: Object.entries(obj).filter(([,v]) => v).map(([k,v]) => k + '：' + v).join('\n'),
+      confidence: 100, fieldConfidence:{}, selected:true
+    }, index);
+  }
+
+  async function importCsv(file) {
+    if (!file) return;
+    try {
+      setStatus('正在解析 CSV…');
+      const rows = parseCsv(await file.text());
+      if (rows.length < 2) throw new Error('empty-csv');
+      const headers = rows[0].map(v => String(v).trim());
+      results = rows.slice(1).map((row, index) => {
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = String(row[i] ?? '').trim());
+        return csvRowToResult(obj, index);
+      }).filter(r => r.name || r.nameEn || r.company || r.email || r.mobile || r.phone);
+      if (!results.length) throw new Error('no-cards');
+      reviewFilter = 'all';
+      batchSource = batchSource || ('CSV：' + (file.name || '名片匯入'));
+      const source = $('aiBatchSource'); if (source && !source.value) source.value = batchSource;
+      compareWithExisting();
+      setStatus('已匯入 ' + results.length + ' 張名片。資料只在此裝置解析，請確認後再儲存。');
+      renderResults();
+    } catch (err) {
+      console.error('CSV import failed', err);
+      setStatus('CSV 匯入失敗，請確認第一列是欄位名稱，並使用 UTF-8 CSV。');
+    }
+  }
+
   function normalizeResult(item, index) {
     const fieldConfidence = item.fieldConfidence || {};
     return {
@@ -125,6 +221,7 @@
       category: item.category || '未分類',
       note: item.note || '',
       rawText: item.rawText || '',
+      importedCreatedAt: item.importedCreatedAt || '',
       fieldConfidence,
       duplicateStatus: item.duplicateStatus || '',
       previousId: item.previousId || '',
@@ -365,7 +462,7 @@
           companyAddress:r.companyAddress, postalCode:r.postalCode, country:r.country,
           category:r.category || '未分類',
           note:[batchSource ? '來源：' + batchSource : '', r.note || ''].filter(Boolean).join(' · '),
-          rawText:r.rawText || '', photo, thumb, aiBatch:true, aiConfidence:r.confidence || 0
+          rawText:r.rawText || '', photo, thumb, imported:true, importSource:batchSource || 'CSV / 批次匯入', aiBatch:!!photo, aiConfidence:r.confidence || 0
         };
         if (r.previousId && (r.saveAction === 'merge' || r.saveAction === 'replace')) {
           const old = (window.CardKeeperBatch?.cards || []).find(c => c.id === r.previousId);
@@ -401,6 +498,7 @@
   }
 
   $('btnAiBatch')?.addEventListener('click', open);
+  $('cardCsvImport')?.addEventListener('change', async e => { const file=e.target.files?.[0]; e.target.value=''; await importCsv(file); });
   const sourceInput = document.createElement('input');
   sourceInput.id = 'aiBatchSource';
   sourceInput.className = 'ai-batch-source';
