@@ -36,7 +36,7 @@
     screen.classList.add('hidden');
   }
 
-  async function fileToDataUrl(file, maxSide = 1800, quality = .9) {
+  async function fileToDataUrl(file, maxSide = 1400, quality = .82) {
     const original = await new Promise((resolve, reject) => {
       const r = new FileReader();
       r.onload = () => resolve(r.result);
@@ -68,7 +68,8 @@
       photos.push({
         id: 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
         name: file.name || 'camera.jpg',
-        dataUrl
+        dataUrl,
+        originalBytes: file.size || 0
       });
     }
     setStatus('');
@@ -77,7 +78,8 @@
 
   function renderPhotos() {
     const grid = $('aiBatchPreviewGrid');
-    $('aiBatchCount').textContent = photos.length + ' 張照片';
+    const totalMB = photos.reduce((sum,p) => sum + Math.round((p.dataUrl?.length || 0) * .75), 0) / 1024 / 1024;
+    $('aiBatchCount').textContent = photos.length + ' 張 · ' + totalMB.toFixed(1) + ' MB';
     $('aiBatchEmpty').classList.toggle('hidden', photos.length > 0);
     $('btnAiAnalyze').disabled = photos.length === 0;
     grid.innerHTML = photos.map((p, i) => `
@@ -113,6 +115,13 @@
       email: item.email || '',
       website: item.website || '',
       address: item.address || '',
+      department: item.department || '',
+      extension: item.extension || '',
+      line: item.line || '',
+      linkedin: item.linkedin || '',
+      companyAddress: item.companyAddress || '',
+      postalCode: item.postalCode || '',
+      country: item.country || '',
       category: item.category || '未分類',
       note: item.note || '',
       rawText: item.rawText || '',
@@ -221,6 +230,12 @@
               <div>☎️ ${esc(r.phone || '—')} ${confidenceBadge(r,'phone',r.phone)}</div>
               <div>✉️ ${esc(r.email || '—')} ${confidenceBadge(r,'email',r.email)}</div>
               <div>🏷️ ${esc(r.category || '未分類')}</div>
+              <div>🏢 ${esc(r.department || '—')} ${confidenceBadge(r,'department',r.department)}</div>
+              <div>分機 ${esc(r.extension || '—')} ${confidenceBadge(r,'extension',r.extension)}</div>
+              <div>LINE ${esc(r.line || '—')} ${confidenceBadge(r,'line',r.line)}</div>
+              <div>🌐 ${esc(r.website || '—')} ${confidenceBadge(r,'website',r.website)}</div>
+              <div>LinkedIn ${esc(r.linkedin || '—')}</div>
+              <div>📍 ${esc(r.address || r.companyAddress || '—')} ${confidenceBadge(r,'address',r.address || r.companyAddress)}</div>
             </div>
             ${r.duplicateStatus ? `<div class="ai-duplicate-note">${esc(r.duplicateStatus)}</div>` : ''}
           </article>`;
@@ -260,6 +275,8 @@
           name:r.name, nameEn:r.nameEn, company:r.company, title:r.title,
           mobile:r.mobile, phone:r.phone, phone2:r.phone2, fax:r.fax,
           email:r.email, website:r.website, address:r.address,
+          department:r.department, extension:r.extension, line:r.line, linkedin:r.linkedin,
+          companyAddress:r.companyAddress, postalCode:r.postalCode, country:r.country,
           category:r.category || '未分類', note:[batchSource ? '來源：' + batchSource : '', r.note || ''].filter(Boolean).join(' · '),
           favorite:false, rawText:r.rawText || '', photo, thumb,
           backPhoto:'', backThumb:'', createdAt:now, updatedAt:now,
@@ -297,18 +314,21 @@
       {
         name:'王志明', company:'星辰科技股份有限公司', title:'業務經理',
         mobile:'0912-345-678', phone:'02-2345-6789', email:'ming.wang@example.com',
+        department:'企業金融部', extension:'1688', line:'', website:'www.example.com', linkedin:'', address:'台北市信義區',
         category:'科技', confidence:96,
         fieldConfidence:{name:97,company:99,title:92,mobile:98,phone:93,email:96}
       },
       {
         name:'林怡君', company:'國際商業銀行', title:'副理',
         mobile:'', phone:'02-8765-4321', email:'yj.lin@example.com',
+        department:'法人金融處', extension:'1234', line:'linyj', website:'www.bank.example', linkedin:'', address:'台北市松山區',
         category:'金融', confidence:78,
         fieldConfidence:{name:90,company:96,title:68,phone:84,email:62}
       },
       {
         name:'陳建宏', company:'遠景顧問有限公司', title:'資深顧問',
         mobile:'0988-123-456', phone:'', email:'jason.chen@example.com',
+        department:'策略顧問部', extension:'', line:'jasonchen', website:'www.consult.example', linkedin:'linkedin.com/in/jasonchen', address:'台北市中山區',
         category:'顧問', confidence:88,
         fieldConfidence:{name:92,company:91,title:86,mobile:95,email:87}
       }
