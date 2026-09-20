@@ -924,6 +924,13 @@
     });
   }
 
+  el('btnCategoryManager')?.addEventListener('click', async () => {
+    el('backupCardCount').textContent = allCards.length;
+    renderCategoryManager();
+    showScreen(screenBackup);
+    requestAnimationFrame(() => el('categoryManagerCard')?.scrollIntoView({block:'start'}));
+  });
+
   el('btnBackup').addEventListener('click', async () => {
     el('backupCardCount').textContent = allCards.length;
     renderCategoryManager();
