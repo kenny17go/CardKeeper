@@ -873,8 +873,52 @@
   // ===================================================
   // Backup / restore
   // ===================================================
+  function renderCategoryManager(){
+    const box=el('categoryManagerList'); if(!box) return;
+    const cats=getCategories().filter(c=>c && c!=='未分類');
+    if(!cats.length){ box.innerHTML='<p class="backup-note">目前沒有自訂分類。</p>'; return; }
+    box.innerHTML=cats.map(cat=>`<div class="category-manager-row" data-cat="${escapeHtml(cat)}">
+      <span><strong>${escapeHtml(cat)}</strong><small>${allCards.filter(c=>cardCategories(c).includes(cat)).length} 張</small></span>
+      <button type="button" data-action="rename">重新命名</button>
+      <button type="button" data-action="delete" class="danger-text">刪除</button>
+    </div>`).join('');
+    box.querySelectorAll('.category-manager-row').forEach(row=>{
+      const old=row.dataset.cat;
+      row.querySelector('[data-action="rename"]').addEventListener('click',async()=>{
+        const next=prompt('將「'+old+'」重新命名為：',old); if(next===null)return;
+        const clean=next.trim(); if(!clean||clean===old)return;
+        try{
+          for(const card of allCards){
+            let changed=false;
+            if(card.category===old){ card.category=clean; changed=true; }
+            if(Array.isArray(card.tags)&&card.tags.includes(old)){
+              card.tags=[...new Set(card.tags.map(t=>t===old?clean:t).filter(Boolean))]; changed=true;
+            }
+            if(changed){card.updatedAt=Date.now();await CardDB.put(card);}
+          }
+          if(activeTab===old) activeTab=clean;
+          await loadCards(); renderCategoryManager(); showToast('分類已重新命名');
+        }catch(e){console.error(e);showToast('重新命名失敗');}
+      });
+      row.querySelector('[data-action="delete"]').addEventListener('click',async()=>{
+        if(!confirm('刪除分類「'+old+'」？\n名片不會被刪除。'))return;
+        try{
+          for(const card of allCards){
+            let changed=false;
+            if(card.category===old){card.category='未分類';changed=true;}
+            if(Array.isArray(card.tags)&&card.tags.includes(old)){card.tags=card.tags.filter(t=>t!==old);changed=true;}
+            if(changed){card.updatedAt=Date.now();await CardDB.put(card);}
+          }
+          if(activeTab===old)activeTab='all';
+          await loadCards();renderCategoryManager();showToast('已刪除分類，名片仍保留');
+        }catch(e){console.error(e);showToast('刪除分類失敗');}
+      });
+    });
+  }
+
   el('btnBackup').addEventListener('click', async () => {
     el('backupCardCount').textContent = allCards.length;
+    renderCategoryManager();
     showScreen(screenBackup);
   });
   el('btnBackupBack').addEventListener('click', closeAllScreens);
