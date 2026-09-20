@@ -958,13 +958,19 @@
         id: c.id || uid(),
         name: c.name || '', nameEn: c.nameEn || '',
         company: c.company || '', title: c.title || '',
+        department: c.department || '', taxId: c.taxId || '',
         mobile: c.mobile || '', phone: c.phone || '',
-        phone2: c.phone2 || '', fax: c.fax || '',
+        phone2: c.phone2 || '', extension: c.extension || '', fax: c.fax || '',
         email: c.email || '', website: c.website || '',
-        address: c.address || '', category: c.category || '未分類',
+        address: c.address || '', companyAddress: c.companyAddress || '',
+        postalCode: c.postalCode || '', country: c.country || '',
+        category: c.category || '未分類',
+        tags: Array.isArray(c.tags) ? [...new Set(c.tags.filter(Boolean))] : [],
         note: c.note || '', favorite: !!c.favorite,
         rawText: c.rawText || '', photo: c.photo || '', thumb: c.thumb || '',
         backPhoto: c.backPhoto || '', backThumb: c.backThumb || '',
+        imported: !!c.imported, importSource: c.importSource || '',
+        aiBatch: !!c.aiBatch, aiConfidence: Number(c.aiConfidence || 0),
         createdAt: c.createdAt || Date.now(), updatedAt: c.updatedAt || Date.now()
       }));
       const added = await CardDB.bulkPutIfNotExists(normalized);
