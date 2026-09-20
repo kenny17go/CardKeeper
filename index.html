@@ -31,7 +31,7 @@
     <div>
       <div class="home-title-meta">
         <p class="eyebrow">CARDKEEPER</p>
-        <span class="app-version">Import Test · 5.3.3</span>
+        <span class="app-version">Import Test · 5.3.4</span>
       </div>
       <h1>名片</h1>
     </div>
@@ -308,6 +308,11 @@
       <label class="btn-outline full" for="importFile">📥 從 JSON 還原</label>
       <input id="importFile" type="file" accept="application/json" class="hidden">
       <p class="backup-note">還原會將備份中的名片與目前資料合併，不會覆蓋既有名片（依 ID 比對）。</p>
+    </div>
+    <div class="backup-card">
+      <p class="backup-count">分類管理</p>
+      <p class="backup-note">重新命名或刪除自訂分類。刪除分類只會移除標籤，不會刪除名片。</p>
+      <div id="categoryManagerList" class="category-manager-list"></div>
     </div>
     <div class="backup-card danger">
       <p class="backup-count">清除本機所有名片資料</p>
