@@ -238,8 +238,15 @@
       for(const id of batchSelectedIds){
         const card=await CardDB.get(id); if(!card) continue;
         const tags=Array.isArray(card.tags)?card.tags.filter(Boolean):[];
-        if(!tags.includes(clean) && card.category!==clean) tags.push(clean);
-        card.tags=[...new Set(tags)];
+        // If this card is still "未分類", the first batch classification becomes its
+        // primary category. Additional classifications remain multi-category tags.
+        if(!card.category || card.category==='未分類'){
+          card.category=clean;
+          card.tags=tags.filter(t=>t!=='未分類' && t!==clean);
+        }else{
+          if(!tags.includes(clean) && card.category!==clean) tags.push(clean);
+          card.tags=[...new Set(tags.filter(t=>t!=='未分類'))];
+        }
         card.updatedAt=Date.now();
         await CardDB.put(card);
       }
