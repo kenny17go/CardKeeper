@@ -755,3 +755,8 @@ body{background:var(--ios-bg);}
 .search-batch-row>span{font-size:13px;font-weight:700;color:#1769e0;white-space:nowrap}
 .search-batch-row .batch-tag-bar{margin-left:auto;padding:0}
 .search-batch-row .batch-tag-bar button{background:#fff;box-shadow:0 1px 4px rgba(22,32,51,.08)}
+
+/* 5.3.4 category management */
+.category-manager-list{display:grid;gap:8px;margin-top:12px}.category-manager-row{display:flex;align-items:center;gap:7px;padding:10px 0;border-top:1px solid var(--line)}
+.category-manager-row>span{display:flex;flex-direction:column;gap:2px;margin-right:auto;min-width:0}.category-manager-row strong{font-size:14px}.category-manager-row small{font-size:11px;color:var(--ink-soft)}
+.category-manager-row button{border:0;background:#f3f6fa;border-radius:9px;padding:7px 9px;font-size:12px;color:var(--ios-blue);font-weight:700}.category-manager-row .danger-text{color:#d92d20}
