@@ -673,6 +673,7 @@
       postalCode: (fd.get('postalCode') || '').trim(),
       country: (fd.get('country') || '').trim(),
       category: (fd.get('category') || '').trim() || '未分類',
+      tags: editingCardId ? ([...((await CardDB.get(editingCardId))?.tags || [])]) : [],
       note: (fd.get('note') || '').trim(),
       favorite: fd.get('favorite') === 'on',
       rawText: pendingCapture ? pendingCapture.rawText : (editingCardId ? (await CardDB.get(editingCardId))?.rawText : ''),
