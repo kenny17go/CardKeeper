@@ -31,7 +31,7 @@
     <div>
       <div class="home-title-meta">
         <p class="eyebrow">CARDKEEPER</p>
-        <span class="app-version">Import Test · 5.3.6</span>
+        <span class="app-version">Import Test · 5.3.7</span>
       </div>
       <h1>名片</h1>
     </div>
@@ -96,6 +96,41 @@
       <p>保留 CardKeeper 原本的相機＋OCR 掃描；另外可匯入其他名片 App 產生的 CSV。資料會先預覽、確認、比對重複，再由你決定是否存入。</p>
       <label class="btn-brass full">📄 匯入名片 CSV<input id="cardCsvImport" type="file" accept=".csv,text/csv,text/plain" class="hidden"></label>
       <p class="backup-note">目前已相容「姓名、公司、職稱、電話、Email、網站、地址、LINE ID、LinkedIn、統編、備註、建立日期」格式；匯入全程在此裝置處理，不會上傳雲端。</p>
+    </div>
+    <div class="ai-batch-intro" id="chatgptPromptCard">
+      <h3>ChatGPT 批次辨識</h3>
+      <p><strong>🔒 建議先開 Temporary Chat（暫時聊天）</strong>，再上傳 3×3 名片照片。取得 CSV 並成功匯入後即可結束暫時聊天。</p>
+      <details>
+        <summary style="cursor:pointer;font-weight:700;padding:8px 0">CardKeeper 專用固定提示詞</summary>
+        <textarea id="cardKeeperPrompt" readonly rows="12" style="width:100%;box-sizing:border-box;margin:10px 0;padding:12px;border:1px solid #d7dce5;border-radius:12px;background:#f8fafc;font-size:13px;line-height:1.55">我正在整理實體名片，請辨識我這次上傳的所有名片照片。
+
+每張照片可能同時包含多張名片，例如 3×3 共 9 張；如果一次上傳多張照片，請辨識所有照片中的全部名片，最後合併成同一份資料。
+
+請遵守以下規則：
+1. 每一張實體名片只能建立一筆資料，不要把不同名片的資料混在一起。
+2. 請依照片中的位置分辨不同名片。
+3. 不確定或看不清楚的資料請留白，禁止自行猜測。
+4. 中文姓名與英文姓名分開。
+5. 公司名稱請盡量使用名片上的完整正式名稱。
+6. 手機、公司電話、第二電話、分機、傳真必須分開。
+7. Email、網址必須忠實抄錄，不要自行修改。
+8. 地址請完整保留；能明確判斷郵遞區號時另外填入郵遞區號。
+9. 統一編號只有在名片明確出現時才填入。
+10. 可依公司／機構性質填入合理的分類；無法確定則填「未分類」。
+11. LINE、LinkedIn 或其他沒有專屬欄位的重要資訊放入備註。
+12. 如果發現不同照片中疑似出現同一張名片，不要擅自刪除，在備註標示「疑似重複」，交由 CardKeeper 處理。
+13. 特別仔細檢查容易辨識錯誤的 0/O、1/I/l、5/S、8/B，以及 Email、電話、分機、網址中的英數字。
+14. 完成後請再次逐張核對原始照片，尤其檢查姓名、公司、電話、Email。
+
+請使用以下固定欄位與順序：
+姓名、英文姓名、公司、統編、部門、職稱、手機、公司電話、第二電話、分機、傳真、Email、網站、地址、公司地址、郵遞區號、國家/地區、分類、備註
+
+最後請直接產生一個 UTF-8 CSV 檔案供我下載，檔名格式為 CardKeeper_YYYYMMDD.csv。
+CSV 必須一張名片一列，第一列為上述固定欄位名稱，必須能直接匯入 CardKeeper。
+請不要只把 CSV 內容貼在聊天訊息中，我需要可以下載的 .csv 檔案。</textarea>
+        <button id="btnCopyCardKeeperPrompt" type="button" class="btn-outline full">📋 複製固定提示詞</button>
+        <p id="copyPromptStatus" class="backup-note">複製後切到 ChatGPT Temporary Chat，貼上提示詞並加入名片照片。</p>
+      </details>
     </div>
     <div class="ai-batch-actions">
       <label class="btn-brass full">📷 拍攝一張<input id="aiBatchCameraInput" type="file" accept="image/*" capture="environment" class="hidden"></label>
@@ -348,5 +383,19 @@
 <script src="js/camera.js"></script>
 <script src="js/ai-batch.js"></script>
 <script src="js/app.js"></script>
+<script>
+document.getElementById('btnCopyCardKeeperPrompt')?.addEventListener('click', async () => {
+  const el = document.getElementById('cardKeeperPrompt');
+  const status = document.getElementById('copyPromptStatus');
+  try {
+    await navigator.clipboard.writeText(el.value);
+    status.textContent = '✓ 已複製。現在開啟 ChatGPT Temporary Chat，貼上後加入名片照片。';
+  } catch (_) {
+    el.focus(); el.select();
+    document.execCommand('copy');
+    status.textContent = '✓ 已複製。現在開啟 ChatGPT Temporary Chat，貼上後加入名片照片。';
+  }
+});
+</script>
 </body>
 </html>
